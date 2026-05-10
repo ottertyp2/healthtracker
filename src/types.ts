@@ -249,12 +249,142 @@ export type AppData = {
   shoppingList: ShoppingListItem[];
 };
 
+export type DataQualityLevel = "low" | "medium" | "high";
+
+export type DailyFact = {
+  id: string;
+  date: string;
+
+  sleepHours?: number;
+  sleepStart?: string;
+  sleepEnd?: string;
+  sleepDebt7d?: number;
+  restingHeartRate?: number;
+  steps?: number;
+
+  energy?: number;
+  focus?: number;
+  stress?: number;
+  sleepQuality?: number;
+
+  caffeineTotalMg?: number;
+  caffeineAfter14Mg?: number;
+  lastCaffeineTime?: string;
+
+  kcal?: number;
+  protein?: number;
+  proteinBefore12g?: number;
+  fiber?: number;
+  magnesium?: number;
+  potassium?: number;
+  vitaminD?: number;
+  omega3?: number;
+
+  firstProteinTime?: string;
+  lastMealTime?: string;
+  mealRegularityScore?: number;
+
+  trainingLoad?: number;
+  trainedMuscles?: string[];
+  sorenessLoad?: number;
+  painLoad?: number;
+
+  isHome?: boolean;
+  deepWorkMinutes?: number;
+  studyMinutes?: number;
+
+  dataQuality: {
+    nutrition: DataQualityLevel;
+    sleep: DataQualityLevel;
+    subjective: DataQualityLevel;
+  };
+};
+
+export type HealthHypothesis = {
+  id: string;
+  title: string;
+
+  causeMetric: string;
+  outcomeMetric: string;
+  lagDays: 0 | 1 | 2;
+
+  direction: "higher_is_better" | "lower_is_better";
+  minObservations: number;
+
+  observations: number;
+  effectEstimate?: number;
+  confidence: "insufficient" | "weak" | "medium" | "strong";
+
+  evidenceSummary: string;
+  counterEvidence?: string;
+
+  suggestedExperiment?: {
+    action: string;
+    durationDays: number;
+    successMetric: string;
+  };
+
+  status: "watching" | "testing" | "confirmed" | "rejected";
+  updatedAt: string;
+};
+
+export type Intervention = {
+  id: string;
+  createdAt: string;
+  trigger: string;
+  hypothesisId?: string;
+
+  recommendation: string;
+  expectedBenefit: string;
+  friction: "low" | "medium" | "high";
+  confidence: "low" | "medium" | "high";
+
+  actionWindow?: {
+    start: string;
+    end: string;
+  };
+
+  userResponse?: "accepted" | "ignored" | "rejected" | "completed";
+
+  outcomeMetrics?: {
+    focus?: number;
+    energy?: number;
+    sleepHours?: number;
+    stress?: number;
+  };
+
+  result?: "helped" | "neutral" | "hurt" | "unknown";
+};
+
+export type InsightCard = {
+  id: string;
+  createdAt: string;
+  title: string;
+  claim: string;
+
+  evidence: string[];
+  counterEvidence: string[];
+
+  confidence: "insufficient" | "weak" | "medium" | "strong";
+  action?: string;
+  experiment?: string;
+
+  dismissReason?: string;
+  userRating?: "useful" | "not_useful";
+};
+
 export type AgentRun = {
   id: string;
   createdAt: string;
   summary: string;
+
+  insightUpdates?: InsightCard[];
+  hypothesisUpdates?: HealthHypothesis[];
+  interventionActions?: Intervention[];
+
   calendarActions: string[];
-  taskActions: Array<string | AgentTaskAction>;
+  taskActions: AgentTaskAction[];
+
   nutritionUpdates?: Array<{
     mealId: string;
     nutrients: Nutrients;
