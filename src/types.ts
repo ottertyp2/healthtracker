@@ -383,7 +383,7 @@ export type AgentRun = {
   interventionActions?: Intervention[];
 
   calendarActions: string[];
-  taskActions: AgentTaskAction[];
+  taskActions: Array<string | AgentTaskAction>;
 
   nutritionUpdates?: Array<{
     mealId: string;
@@ -395,6 +395,10 @@ export type AgentRun = {
   keepActions?: string[];
   warnings: string[];
   nextPriorities: string[];
+
+  source?: string;
+  mode?: "noop" | "intervention" | "nutrition_pending" | string;
+  runHourKey?: string;
 };
 
 export type MealType = MealEntry["mealType"];
