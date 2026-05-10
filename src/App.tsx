@@ -290,6 +290,17 @@ function buildHealthImportFromParams(params: URLSearchParams): HealthImport | un
   return hasData ? importItem : undefined;
 }
 
+function buildHealthShortcutUrl(token: string, payload?: Partial<HealthImport>) {
+  const url = new URL(`${window.location.origin}${window.location.pathname}`);
+  url.searchParams.set("shortcutToken", token);
+
+  if (payload) {
+    url.searchParams.set("healthPayload", JSON.stringify(payload));
+  }
+
+  return url.toString();
+}
+
 function combineFoodReferences(custom: FoodReference[]) {
   const customIds = new Set(custom.map((food) => food.id));
   return [...custom, ...defaultFoods.filter((food) => !customIds.has(food.id))];
@@ -768,7 +779,7 @@ function HealthApp() {
       setNotice({ tone: "good", text: "iPhone Health-Import wurde gespeichert." });
       window.history.replaceState({}, "", window.location.pathname);
     });
-  }, [settings.shortcutToken]);
+  }, [settings.shortcutToken, saveItem]);
 
   async function handleSignIn() {
     if (!auth || !googleProvider) return;
@@ -2224,10 +2235,21 @@ function AutomationScreen({
   );
   const latestRun = recentRuns[0];
   const nextAgentRunAt = nextFullHour();
-  const origin = window.location.origin;
-  const agentUrl = `${origin}${window.location.pathname}?agent=${settings.agentToken}`;
-  const shortcutBaseUrl = `${origin}${window.location.pathname}?shortcutToken=${settings.shortcutToken}`;
-  const shortcutTemplateUrl = `${shortcutBaseUrl}&date=${todayKey()}&sleepHours=[SchlafStunden]&steps=[Schritte]&restingHeartRate=[Ruhepuls]&weightKg=[GewichtKg]&bodyFatPct=[KoerperfettPct]`;
+  const appBaseUrl = `${window.location.origin}${window.location.pathname}`;
+  const agentUrl = `${appBaseUrl}?agent=${settings.agentToken}`;
+  const shortcutBaseUrl = useMemo(() => buildHealthShortcutUrl(settings.shortcutToken), [settings.shortcutToken]);
+  const shortcutJsonExampleUrl = useMemo(
+    () =>
+      buildHealthShortcutUrl(settings.shortcutToken, {
+        date: todayKey(),
+        sleepHours: 7.4,
+        steps: 8200,
+        restingHeartRate: 58,
+        weightKg: 80.2,
+        bodyFatPct: 14.1,
+      }),
+    [settings.shortcutToken],
+  );
 
   async function copyText(value: string) {
     await navigator.clipboard?.writeText(value);
@@ -2429,26 +2451,52 @@ function AutomationScreen({
       <section className="panel">
         <SectionHeader title="iPhone Health Import" />
         <p className="panel-copy">
-          Die Web-App kann Apple Health nicht direkt auslesen. Der iOS Shortcut muss echte Health-Samples lesen und diese URL mit den berechneten Werten oeffnen.
+          Die Web-App kann Apple Health nicht direkt auslesen. Der iOS Shortcut liest echte
+          Health-Samples und haengt sie als URL-codiertes JSON an healthPayload.
         </p>
-        <div className="token-box">
-          <ClipboardList size={18} />
-          <input readOnly value={shortcutBaseUrl} onFocus={(event) => event.currentTarget.select()} />
+        <div className="form-grid">
+          <label className="field field-wide">
+            <span>Basis-URL fuer Kurzbefehle</span>
+            <textarea
+              readOnly
+              rows={3}
+              value={shortcutBaseUrl}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          </label>
+
+          <label className="field field-wide">
+            <span>JSON-Beispiel-Link</span>
+            <textarea
+              readOnly
+              rows={5}
+              value={shortcutJsonExampleUrl}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+          </label>
         </div>
         <div className="shortcut-grid">
+          <InfoRow
+            icon={<FileJson size={17} />}
+            title="healthPayload"
+            detail="URL-codiertes JSON mit date, sleepHours, steps, restingHeartRate, weightKg und bodyFatPct."
+          />
           <InfoRow icon={<Moon size={17} />} title="sleepHours" detail="Zahl in Stunden, z.B. aus Schlaf-Samples der letzten Nacht berechnet." />
           <InfoRow icon={<Activity size={17} />} title="steps" detail="Schritte heute oder gestern, je nachdem wann der Shortcut laeuft." />
           <InfoRow icon={<HeartPulse size={17} />} title="restingHeartRate" detail="Ruhepuls aus Apple Health." />
           <InfoRow icon={<Gauge size={17} />} title="weightKg / bodyFatPct" detail="Letzter Gewicht- und Koerperfettwert, wenn vorhanden." />
         </div>
+        <p className="panel-copy">
+          Im iPhone-Kurzbefehl: Basis-URL nehmen und healthPayload als URL-codiertes JSON anhaengen.
+        </p>
         <div className="button-row">
           <button className="secondary-button" onClick={() => copyText(shortcutBaseUrl)}>
             <ClipboardList size={18} />
             Basis-URL kopieren
           </button>
-          <button className="secondary-button" onClick={() => copyText(shortcutTemplateUrl)}>
+          <button className="secondary-button" onClick={() => copyText(shortcutJsonExampleUrl)}>
             <ClipboardList size={18} />
-            Template kopieren
+            JSON-Beispiel kopieren
           </button>
           <button className="secondary-button" onClick={rotateShortcutToken}>
             <RefreshCw size={18} />
