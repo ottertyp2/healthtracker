@@ -2551,6 +2551,10 @@ function InsightsScreen({
     { name: "Eisen", value: todaysNutrition.iron, target: 8, unit: "mg" },
     { name: "Magnesium", value: todaysNutrition.magnesium, target: 350, unit: "mg" },
   ];
+  const evidenceEngine = useMemo(
+    () => buildEvidenceEngineSnapshot(data, today),
+    [data, today],
+  );
 
   return (
     <div className="screen stack">
@@ -2590,11 +2594,76 @@ function InsightsScreen({
       </section>
 
       <section className="panel">
-        <SectionHeader title="N-of-1 Kandidaten" />
-        <div className="list">
-          <InfoRow icon={<Gauge size={17} />} title="Koffein Timing" detail="Vergleiche Koffein nach 14 Uhr mit Schlafdauer und Fokus am Folgetag." />
-          <InfoRow icon={<Salad size={17} />} title="Lunch Carbs" detail="Vergleiche Kartoffeln/Brot mittags mit Lernfokus am Wochenende." />
-          <InfoRow icon={<Dumbbell size={17} />} title="Gym Load" detail="Vergleiche intensive Beine mit Schlaf, Muskelkater und Produktivitaet." />
+        <SectionHeader
+          title="Evidence Cards"
+          action={
+            <Pill tone={evidenceEngine.insightCards.length ? "good" : "warn"}>
+              {evidenceEngine.insightCards.length
+                ? `${evidenceEngine.insightCards.length} aktiv`
+                : "noch schwach"}
+            </Pill>
+          }
+        />
+
+        <div className="insight-card-list">
+          {evidenceEngine.insightCards.length === 0 ? (
+            <EmptyLine text="Noch keine belastbaren Muster. Das ist korrekt: erst mehr Daten sammeln, dann handeln." />
+          ) : (
+            evidenceEngine.insightCards.map((card) => (
+              <article key={card.id} className="evidence-card">
+                <div className="evidence-card-head">
+                  <div>
+                    <strong>{card.title}</strong>
+                    <small>{card.claim}</small>
+                  </div>
+                  <Pill
+                    tone={
+                      card.confidence === "strong" || card.confidence === "medium"
+                        ? "good"
+                        : "warn"
+                    }
+                  >
+                    {card.confidence}
+                  </Pill>
+                </div>
+
+                <div className="evidence-card-body">
+                  <div>
+                    <span>Evidence</span>
+                    {card.evidence.length ? (
+                      <ul>
+                        {card.evidence.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <small>Keine Einzelbelege gespeichert.</small>
+                    )}
+                  </div>
+
+                  <div>
+                    <span>Counter</span>
+                    {card.counterEvidence.length ? (
+                      <ul>
+                        {card.counterEvidence.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <small>Keine Gegenbelege gespeichert.</small>
+                    )}
+                  </div>
+                </div>
+
+                {(card.experiment || card.action) && (
+                  <div className="evidence-card-action">
+                    {card.experiment && <small>Experiment: {card.experiment}</small>}
+                    {card.action && <strong>{card.action}</strong>}
+                  </div>
+                )}
+              </article>
+            ))
+          )}
         </div>
       </section>
 

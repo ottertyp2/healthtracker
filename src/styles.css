@@ -4541,6 +4541,99 @@ body {
   }
 }
 
+.insight-card-list {
+  display: grid;
+  gap: 14px;
+}
+
+.evidence-card {
+  border: 1px solid rgba(99, 102, 241, 0.14);
+  border-radius: 28px;
+  padding: 18px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(239, 246, 255, 0.72)),
+    radial-gradient(circle at 12% 8%, rgba(125, 211, 252, 0.18), transparent 34%);
+  box-shadow:
+    14px 18px 42px rgba(31, 41, 55, 0.09),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.9),
+    inset -10px -12px 24px rgba(148, 163, 184, 0.08);
+}
+
+.evidence-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.evidence-card-head strong {
+  display: block;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.evidence-card-head small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.evidence-card-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.evidence-card-body > div {
+  border-radius: 20px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow:
+    inset 5px 5px 12px rgba(148, 163, 184, 0.08),
+    inset -5px -5px 12px rgba(255, 255, 255, 0.72);
+}
+
+.evidence-card-body span {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.evidence-card-body ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.evidence-card-body li,
+.evidence-card-body small {
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.evidence-card-action {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  border-radius: 20px;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.09));
+}
+
+.evidence-card-action small {
+  color: var(--muted);
+}
+
+.evidence-card-action strong {
+  color: var(--text);
+}
+
 /* BioSoft Premium Fix: Hourly Agent Prompt Lesbarkeit */
 .panel pre,
 .panel code,
