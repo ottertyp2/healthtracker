@@ -943,7 +943,13 @@ function HealthApp() {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  return <main className="app-shell">{children}</main>;
+  return (
+    <main className="app-shell">
+      <span className="ambient-orb ambient-orb-one" aria-hidden="true" />
+      <span className="ambient-orb ambient-orb-two" aria-hidden="true" />
+      {children}
+    </main>
+  );
 }
 
 function LoadingState({ label }: { label: string }) {
