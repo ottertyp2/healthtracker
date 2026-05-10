@@ -2121,3 +2121,73 @@ textarea:focus-visible {
     transform: scale(1.025);
   }
 }
+
+/* Cooler final pass for a native-feeling iOS/macOS surface */
+:root {
+  --bg: #edf2f8;
+  --surface: rgba(255, 255, 255, 0.9);
+  --surface-soft: rgba(239, 244, 250, 0.86);
+  --surface-strong: rgba(255, 255, 255, 0.97);
+  --line: rgba(82, 100, 124, 0.18);
+  --shadow: 0 20px 52px rgba(31, 47, 74, 0.13), 0 3px 12px rgba(31, 47, 74, 0.06);
+  --shadow-soft: 0 12px 32px rgba(31, 47, 74, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #080a0f;
+    --surface: rgba(27, 31, 39, 0.82);
+    --surface-soft: rgba(39, 44, 55, 0.78);
+    --surface-strong: rgba(34, 39, 49, 0.96);
+    --line: rgba(226, 233, 244, 0.14);
+  }
+}
+
+html {
+  background:
+    linear-gradient(180deg, #eef5fc 0%, #f9fbff 42%, #edf2f8 100%),
+    linear-gradient(125deg, rgba(0, 122, 255, 0.1), transparent 40%),
+    linear-gradient(300deg, rgba(31, 164, 100, 0.09), transparent 52%);
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    background:
+      linear-gradient(180deg, #0c1018 0%, #080a0f 54%, #10141d 100%),
+      linear-gradient(125deg, rgba(94, 180, 255, 0.13), transparent 40%),
+      linear-gradient(300deg, rgba(49, 209, 125, 0.1), transparent 52%);
+  }
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), transparent 280px),
+    transparent;
+}
+
+.today-hero,
+.shopping-hero {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(245, 249, 255, 0.7)),
+    linear-gradient(120deg, rgba(0, 122, 255, 0.1), transparent 42%),
+    linear-gradient(300deg, rgba(31, 164, 100, 0.1), transparent 56%),
+    var(--surface-strong);
+}
+
+.metric-card,
+.panel,
+.body-map-panel,
+.bottom-nav,
+.app-header {
+  background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+}
+
+@media (min-width: 1040px) {
+  .metric-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .metric-card {
+    min-height: 150px;
+  }
+}
