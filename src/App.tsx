@@ -1,9 +1,7 @@
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
-  getDocs,
   limit,
   onSnapshot,
   orderBy,
@@ -30,7 +28,6 @@ import {
   Gauge,
   HeartPulse,
   Home,
-  KeyRound,
   Loader2,
   LogOut,
   Moon,
@@ -72,9 +69,9 @@ import { prepareMealPhoto } from "./lib/photos";
 import { createDrivePhotoClient, DrivePhotoUploadResult } from "./lib/drive";
 import { googleOAuthClientId, hasGoogleOAuthClient } from "./lib/googleAuth";
 import {
-  type AgentTaskAction,
+  type GeminiTaskAction,
   trackedNutrientKeys,
-  type AgentRun,
+  type GeminiRun,
   type AppData,
   type AutomationSettings,
   type BodyStatus,
@@ -116,7 +113,7 @@ const defaultTabs: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
   { key: "training", label: "Gym", icon: <Dumbbell size={18} /> },
   { key: "supplements", label: "Supps", icon: <Activity size={18} /> },
   { key: "home", label: "Zuhause", icon: <Home size={18} /> },
-  { key: "automation", label: "Agent", icon: <Sparkles size={18} /> },
+  { key: "automation", label: "KI", icon: <Sparkles size={18} /> },
   { key: "insights", label: "Analyse", icon: <BarChart3 size={18} /> },
 ];
 
@@ -141,8 +138,7 @@ const supplementOptions = [
 const localDataKey = "healthtracker.local.data.v1";
 const localSettingsKey = "healthtracker.local.settings.v1";
 const SHOPPING_LIST_TITLE = "Healthtracker Einkaufsliste";
-const HEALTH_AGENT_TOKEN = "agent_d9346b520773dffccf60cc6d809ddd6e9b26";
-const HEALTH_AGENT_FUNCTIONS_REGION = "us-central1";
+const GEMINI_FUNCTIONS_REGION = "us-central1";
 
 function createEmptyData(): AppData {
   return {
@@ -184,12 +180,8 @@ function createToken(prefix: string) {
 function createDefaultSettings(ownerUid = "local"): AutomationSettings {
   return {
     ownerUid,
-    agentToken: createToken("agent"),
     shortcutToken: createToken("shortcut"),
     googleDriveFolderId: undefined,
-    googleTasksListId: undefined,
-    googleTasksListTitle: SHOPPING_LIST_TITLE,
-    googleTasksSyncedAt: undefined,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
@@ -386,14 +378,14 @@ function createShoppingListItem({
   reason,
   priority = "medium",
   source,
-  agentRunId,
+  geminiRunId,
 }: {
   title: string;
   quantity?: string;
   reason?: string;
   priority?: string;
   source: ShoppingListItem["source"];
-  agentRunId?: string;
+  geminiRunId?: string;
 }): ShoppingListItem {
   return {
     id: `shop-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -403,13 +395,13 @@ function createShoppingListItem({
     priority: normalizePriority(priority),
     status: "open",
     source,
-    agentRunId,
+    geminiRunId,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
 }
 
-function parseAgentTaskActions(value: unknown): AgentTaskAction[] {
+function parseGeminiTaskActions(value: unknown): GeminiTaskAction[] {
   if (!Array.isArray(value)) return [];
 
   return value.flatMap((item) => {
@@ -418,7 +410,7 @@ function parseAgentTaskActions(value: unknown): AgentTaskAction[] {
       if (!text) return [];
       try {
         const parsed = JSON.parse(text) as unknown;
-        return parseAgentTaskActions(Array.isArray(parsed) ? parsed : [parsed]);
+        return parseGeminiTaskActions(Array.isArray(parsed) ? parsed : [parsed]);
       } catch {
         const addMatch = text.match(/^(add|hinzufuegen|\+)\s*[:\-]?\s*(.+)$/i);
         return [
@@ -432,10 +424,10 @@ function parseAgentTaskActions(value: unknown): AgentTaskAction[] {
     }
 
     if (!item || typeof item !== "object") return [];
-    const candidate = item as Partial<AgentTaskAction>;
+    const candidate = item as Partial<GeminiTaskAction>;
     if (typeof candidate.item !== "string" || !candidate.item.trim()) return [];
     const action = ["add", "update", "delete", "check", "note"].includes(String(candidate.action))
-      ? (candidate.action as AgentTaskAction["action"])
+      ? (candidate.action as GeminiTaskAction["action"])
       : "note";
     return [
       {
@@ -449,24 +441,17 @@ function parseAgentTaskActions(value: unknown): AgentTaskAction[] {
   });
 }
 
-function parseAgentTaskActionsText(value: string): AgentTaskAction[] {
-  const text = value.trim();
-  if (!text) return [];
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    return parseAgentTaskActions(Array.isArray(parsed) ? parsed : [parsed]);
-  } catch {
-    return parseAgentTaskActions(text.split("\n"));
-  }
+function isShoppingAddAction(action: GeminiTaskAction) {
+  return action.action === "add" && normalizeShoppingTitle(action.target).includes("einkauf");
 }
 
-function isShoppingAddAction(action: AgentTaskAction) {
-  return action.action === "add" && normalizeShoppingTitle(action.target).includes("einkauf");
+function needsGeminiNutrition(meal: MealEntry) {
+  return meal.confidence === "needs-gemini" || !hasMeaningfulNutrition(mealEntryNutrition(meal));
 }
 
 function buildNutritionResearchQueue(data: AppData) {
   return data.mealEntries
-    .filter((meal) => meal.confidence === "needs-agent" || !hasMeaningfulNutrition(mealEntryNutrition(meal)))
+    .filter(needsGeminiNutrition)
     .sort(sortByDateDesc)
     .slice(0, 30)
     .map((meal) => ({
@@ -511,7 +496,7 @@ function formatTime(value: Date | string) {
   return new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
-function sanitizeAgentNutrients(value: unknown): Nutrients | undefined {
+function sanitizeGeminiNutrients(value: unknown): Nutrients | undefined {
   if (!value || typeof value !== "object") return undefined;
   const source = value as Partial<Record<keyof Nutrients, unknown>>;
   const nutrients = zeroNutrients();
@@ -526,10 +511,10 @@ function sanitizeAgentNutrients(value: unknown): Nutrients | undefined {
   return hasMeaningfulNutrition(nutrients) ? nutrients : undefined;
 }
 
-function extractNutritionUpdates(run: AgentRun) {
+function extractNutritionUpdates(run: GeminiRun) {
   return (run.nutritionUpdates ?? [])
     .map((update) => {
-      const nutrients = sanitizeAgentNutrients(update.nutrients);
+      const nutrients = sanitizeGeminiNutrients(update.nutrients);
       if (!update.mealId || !nutrients) return undefined;
       return {
         mealId: update.mealId,
@@ -546,48 +531,6 @@ function extractNutritionUpdates(run: AgentRun) {
     assumptions?: string;
     sources: string[];
   }>;
-}
-
-function parseNutritionUpdates(value: string): AgentRun["nutritionUpdates"] {
-  if (!value.trim()) return [];
-  const parsed = JSON.parse(value) as unknown;
-  if (!Array.isArray(parsed)) throw new Error("Nutrition updates muessen ein JSON-Array sein.");
-
-  return parsed
-    .map((item) => {
-      if (!item || typeof item !== "object") return undefined;
-      const update = item as {
-        mealId?: unknown;
-        nutrients?: unknown;
-        confidence?: unknown;
-        assumptions?: unknown;
-        sources?: unknown;
-      };
-      const nutrients = sanitizeAgentNutrients(update.nutrients);
-      if (typeof update.mealId !== "string" || !nutrients) return undefined;
-      return {
-        mealId: update.mealId,
-        nutrients,
-        confidence: update.confidence === "high" ? "high" : "medium",
-        assumptions: typeof update.assumptions === "string" ? update.assumptions : undefined,
-        sources: Array.isArray(update.sources)
-          ? update.sources.filter((source): source is string => typeof source === "string").slice(0, 8)
-          : undefined,
-      };
-    })
-    .filter(Boolean) as AgentRun["nutritionUpdates"];
-}
-
-function parseJsonArray<T = unknown>(value: string): T[] {
-  const trimmed = value.trim();
-  if (!trimmed) return [];
-
-  const parsed = JSON.parse(trimmed);
-  if (!Array.isArray(parsed)) {
-    throw new Error("JSON muss ein Array sein.");
-  }
-
-  return parsed as T[];
 }
 
 function mapLoadColor(load: number) {
@@ -729,12 +672,6 @@ function useHealthStore(user: User | null) {
 }
 
 export default function App() {
-  const agentToken = new URLSearchParams(window.location.search).get("agent");
-
-  if (agentToken) {
-    return <AgentConsole token={agentToken} />;
-  }
-
   return <HealthApp />;
 }
 
@@ -1138,7 +1075,7 @@ function TodayScreen({
           tone={gymRecommendation.recoveryNeeded ? "warn" : "good"}
         />
         <MetricCard
-          label="Agent"
+          label="KI"
           value={formatTime(nextFullHour())}
           detail="naechstes geplantes Update"
           icon={<Sparkles size={18} />}
@@ -1229,7 +1166,7 @@ function TodayScreen({
           <InfoRow
             icon={<Home size={17} />}
             title={homeToday?.isHome ? "Zuhause eingeplant" : "Kein Zuhause-Tag gesetzt"}
-            detail={homeToday?.plannedMeals?.join(", ") || "Agent kann Mahlzeiten nur fuer markierte Tage planen."}
+            detail={homeToday?.plannedMeals?.join(", ") || "Gemini kann Mahlzeiten nur fuer markierte Tage planen."}
           />
           <InfoRow
             icon={<Flame size={17} />}
@@ -1285,7 +1222,7 @@ function FoodScreen({
     const hasNutrition = hasMeaningfulNutrition(nutrition);
     const needsResearch =
       !hasNutrition ||
-      items.some((item) => item.confidence === "needs-agent" || item.source === "seed-estimate");
+      items.some((item) => item.confidence === "needs-gemini" || item.source === "seed-estimate");
     await onSaveMeal({
       id: `meal-${date}-${Date.now()}`,
       date,
@@ -1296,14 +1233,14 @@ function FoodScreen({
       items,
       total: hasNutrition ? nutrition : undefined,
       nutritionEstimate: hasNutrition ? nutrition : undefined,
-      confidence: needsResearch ? "needs-agent" : items.every((item) => item.confidence === "high") ? "high" : "medium",
-      agentResearch: needsResearch
+      confidence: needsResearch ? "needs-gemini" : items.every((item) => item.confidence === "high") ? "high" : "medium",
+      geminiResearch: needsResearch
         ? {
             status: "queued",
             requestedAt: nowIso(),
             notes: hasNutrition
-              ? "Vorlaeufige Seed-/Produktwerte vorhanden. Agent soll saubere Naehrwerte mit Quellen recherchieren."
-              : "Keine generischen Naehrwerte eingetragen. Agent soll sauber recherchieren.",
+              ? "Vorlaeufige Seed-/Produktwerte vorhanden. Gemini soll saubere Naehrwerte mit Quellen recherchieren."
+              : "Keine generischen Naehrwerte eingetragen. Gemini soll sauber recherchieren.",
           }
         : {
             status: "applied",
@@ -1322,7 +1259,7 @@ function FoodScreen({
     const food = selectedFood ?? findFoodReference(foodReferences, foodQuery);
     if (!food) {
       await saveItems([], freeText || foodQuery || "Unbekanntes Essen");
-      onNotice({ tone: "warn", text: "Essen wurde als Agent-Recherche gespeichert, ohne generische Naehrwerte." });
+      onNotice({ tone: "warn", text: "Essen wurde als Gemini-Recherche gespeichert, ohne generische Naehrwerte." });
       return;
     }
 
@@ -1334,7 +1271,7 @@ function FoodScreen({
         grams,
         nutrients: scaledNutrients(food, grams),
         source: food.source,
-        confidence: food.source === "open-food-facts" ? "high" : food.source === "seed-estimate" ? "needs-agent" : "medium",
+        confidence: food.source === "open-food-facts" ? "high" : food.source === "seed-estimate" ? "needs-gemini" : "medium",
       },
     ]);
   }
@@ -1354,7 +1291,7 @@ function FoodScreen({
           grams: item.grams,
           nutrients: scaledNutrients(food, item.grams),
           source: food.source,
-          confidence: food.source === "open-food-facts" ? "high" : food.source === "seed-estimate" ? "needs-agent" : "medium",
+          confidence: food.source === "open-food-facts" ? "high" : food.source === "seed-estimate" ? "needs-gemini" : "medium",
         } satisfies MealItem;
       })
       .filter(Boolean) as MealItem[];
@@ -1623,7 +1560,7 @@ function ShoppingScreen({
         <div>
           <small>Planung</small>
           <strong>{suggestions.length ? `${suggestions.length} Vorschlaege aus der App` : "Alles Wichtige ist auf der Liste"}</strong>
-          <span>Zuhause-Tage, Standardmahlzeiten und Agent-Aktionen landen hier, ohne Google Tasks als Umweg.</span>
+          <span>Zuhause-Tage, Standardmahlzeiten und Gemini-Vorschlaege landen direkt hier.</span>
         </div>
         <button className="primary-button" type="button" onClick={addAllSuggestions} disabled={suggestions.length === 0}>
           <Plus size={18} />
@@ -2235,7 +2172,7 @@ function AutomationScreen({
   const [manualRunBusy, setManualRunBusy] = useState(false);
   const [researchBusy, setResearchBusy] = useState(false);
   const [taskBusy, setTaskBusy] = useState(false);
-  const [recentRuns, setRecentRuns] = useState<AgentRun[]>([]);
+  const [recentRuns, setRecentRuns] = useState<GeminiRun[]>([]);
   const shoppingItems = useMemo(() => buildShoppingItems(data), [data]);
   const nutritionResearchQueue = useMemo(() => buildNutritionResearchQueue(data), [data]);
   const openShoppingTitles = useMemo(
@@ -2245,16 +2182,13 @@ function AutomationScreen({
   const pendingShoppingActions = useMemo(
     () =>
       recentRuns
-        .flatMap((run) => parseAgentTaskActions(run.taskActions).map((action) => ({ ...action, runId: run.id })))
+        .flatMap((run) => parseGeminiTaskActions(run.taskActions).map((action) => ({ ...action, runId: run.id })))
         .filter((action) => isShoppingAddAction(action) && !openShoppingTitles.has(normalizeShoppingTitle(action.item)))
         .slice(0, 20),
     [recentRuns, openShoppingTitles],
   );
   const latestRun = recentRuns[0];
-  const nextAgentRunAt = nextFullHour();
-  const appBaseUrl = `${window.location.origin}${window.location.pathname}`;
-  const agentToken = HEALTH_AGENT_TOKEN;
-  const agentUrl = `${appBaseUrl}?agent=${agentToken}`;
+  const nextGeminiRunAt = nextFullHour();
   const lastPublishedSnapshotRef = useRef("");
   const shortcutBaseUrl = useMemo(() => buildHealthShortcutUrl(settings.shortcutToken), [settings.shortcutToken]);
   const shortcutJsonExampleUrl = useMemo(
@@ -2282,25 +2216,21 @@ function AutomationScreen({
   async function publishSnapshot({ silent = false }: { silent?: boolean } = {}) {
     if (!usingCloud || !db || !user) {
       if (!silent) {
-        onNotice({ tone: "warn", text: "Agent Mirror braucht Firebase Login." });
+        onNotice({ tone: "warn", text: "Gemini-Snapshot braucht Firebase Login." });
       }
       return;
     }
 
     setPublishing(true);
     try {
-      const snapshot = buildAgentSnapshot({
+      const snapshot = buildGeminiSnapshot({
         ownerUid: user.uid,
-        settings: { ...settings, agentToken },
+        settings,
         data,
         recovery,
         gymRecommendation,
       });
-      await setDoc(doc(db, "agentAccess", agentToken, "snapshots", "latest"), snapshot);
-      await setDoc(doc(db, "agentAccess", agentToken, "meta", "config"), {
-        ownerUid: user.uid,
-        updatedAt: nowIso(),
-      });
+      await setDoc(doc(db, "users", user.uid, "geminiSnapshots", "latest"), snapshot);
       if (!silent) {
         onNotice({ tone: "good", text: "Snapshot aktualisiert." });
       }
@@ -2310,11 +2240,10 @@ function AutomationScreen({
   }
 
   useEffect(() => {
-    if (!usingCloud || !db || !user || !agentToken) return;
+    if (!usingCloud || !db || !user) return;
 
     const publishKey = JSON.stringify({
       ownerUid: user.uid,
-      agentToken,
       dailyLogs: data.dailyLogs.length,
       healthImports: data.healthImports.length,
       mealEntries: data.mealEntries.length,
@@ -2337,51 +2266,50 @@ function AutomationScreen({
   }, [
     usingCloud,
     user,
-    agentToken,
     data,
     recovery.score,
     gymRecommendation.planName,
   ]);
 
   useEffect(() => {
-    if (!usingCloud || !db) {
+    if (!usingCloud || !db || !user) {
       setRecentRuns([]);
       return undefined;
     }
 
     return onSnapshot(
-      query(collection(db, "agentAccess", agentToken, "agentRuns"), orderBy("createdAt", "desc"), limit(8)),
+      query(collection(db, "users", user.uid, "geminiRuns"), orderBy("createdAt", "desc"), limit(8)),
       (items) => {
-        setRecentRuns(items.docs.map((item) => normalizeFirestore<AgentRun>({ id: item.id, ...item.data() })));
+        setRecentRuns(items.docs.map((item) => normalizeFirestore<GeminiRun>({ id: item.id, ...item.data() })));
       },
       () => undefined,
     );
-  }, [usingCloud, agentToken]);
+  }, [usingCloud, user]);
 
-  async function runAgentNow() {
+  async function runGeminiNow() {
     if (!usingCloud || !db || !user || !app) {
-      onNotice({ tone: "warn", text: "Manueller Agent-Lauf braucht Firebase Login." });
+      onNotice({ tone: "warn", text: "Gemini-Lauf braucht Firebase Login." });
       return;
     }
 
     setManualRunBusy(true);
     try {
       await publishSnapshot({ silent: true });
-      const functionsClient = getFunctions(app, HEALTH_AGENT_FUNCTIONS_REGION);
-      const trigger = httpsCallable(functionsClient, "runHealthAgentManual");
+      const functionsClient = getFunctions(app, GEMINI_FUNCTIONS_REGION);
+      const trigger = httpsCallable(functionsClient, "runGeminiAnalysis");
       const result = await trigger();
       const payload = result.data as { status?: string; mode?: string };
 
       if (payload.status === "written") {
         onNotice({
           tone: "good",
-          text: payload.mode ? `Agent-Lauf manuell gestartet (${payload.mode}).` : "Agent-Lauf manuell gestartet.",
+          text: payload.mode ? `Gemini-Lauf gespeichert (${payload.mode}).` : "Gemini-Lauf gespeichert.",
         });
         return;
       }
 
       if (payload.status === "deduped") {
-        onNotice({ tone: "info", text: "In dieser Stunde existiert bereits ein passender No-Op-Run." });
+        onNotice({ tone: "info", text: "In dieser Stunde existiert bereits ein passender No-Op-Lauf." });
         return;
       }
 
@@ -2390,18 +2318,18 @@ function AutomationScreen({
         return;
       }
 
-      onNotice({ tone: "warn", text: "Manueller Agent-Lauf lieferte kein verwertbares Ergebnis." });
+      onNotice({ tone: "warn", text: "Gemini-Lauf lieferte kein verwertbares Ergebnis." });
     } catch (error) {
       onNotice({
         tone: "warn",
-        text: error instanceof Error ? error.message : "Manueller Agent-Lauf ist fehlgeschlagen.",
+        text: error instanceof Error ? error.message : "Gemini-Lauf ist fehlgeschlagen.",
       });
     } finally {
       setManualRunBusy(false);
     }
   }
 
-  async function applyAgentShoppingActions() {
+  async function applyGeminiShoppingActions() {
     setTaskBusy(true);
     try {
       let applied = 0;
@@ -2411,22 +2339,22 @@ function AutomationScreen({
             title: action.item,
             reason: action.reason,
             priority: action.priority,
-            source: "agent",
-            agentRunId: action.runId,
+            source: "gemini",
+            geminiRunId: action.runId,
           }) as ShoppingListItem & Saveable,
         );
         applied += 1;
       }
       onNotice({
         tone: applied ? "good" : "info",
-        text: applied ? `${applied} Agent-Vorschlaege in die Einkaufsliste uebernommen.` : "Keine neuen Agent-Items offen.",
+        text: applied ? `${applied} Gemini-Vorschlaege in die Einkaufsliste uebernommen.` : "Keine neuen Gemini-Items offen.",
       });
     } finally {
       setTaskBusy(false);
     }
   }
 
-  async function applyAgentNutritionUpdates() {
+  async function applyGeminiNutritionUpdates() {
     if (!usingCloud || !db || !user) {
       onNotice({ tone: "warn", text: "Naehrwert-Updates brauchen Firebase Login." });
       return;
@@ -2434,27 +2362,22 @@ function AutomationScreen({
 
     setResearchBusy(true);
     try {
-      const runDocs = await getDocs(
-        query(collection(db, "agentAccess", agentToken, "agentRuns"), orderBy("createdAt", "desc"), limit(20)),
-      );
-      const updates = runDocs.docs.flatMap((item) =>
-        extractNutritionUpdates(normalizeFirestore<AgentRun>({ id: item.id, ...item.data() })),
-      );
+      const updates = recentRuns.flatMap(extractNutritionUpdates);
       const mealsById = new Map(data.mealEntries.map((meal) => [meal.id, meal]));
       let applied = 0;
 
       for (const update of updates) {
         const meal = mealsById.get(update.mealId);
-        if (!meal || meal.confidence !== "needs-agent") continue;
+        if (!meal || meal.confidence !== "needs-gemini") continue;
         await onSaveMeal({
           ...meal,
           total: update.nutrients,
           nutritionEstimate: update.nutrients,
           confidence: update.confidence,
           notes: [meal.notes, update.assumptions].filter(Boolean).join("\n"),
-          agentResearch: {
+          geminiResearch: {
             status: "applied",
-            requestedAt: meal.agentResearch?.requestedAt,
+            requestedAt: meal.geminiResearch?.requestedAt,
             updatedAt: nowIso(),
             sources: update.sources,
             notes: update.assumptions,
@@ -2472,7 +2395,7 @@ function AutomationScreen({
     } catch (error) {
       onNotice({
         tone: "warn",
-        text: error instanceof Error ? error.message : "Agent-Naehrwerte konnten nicht uebernommen werden.",
+        text: error instanceof Error ? error.message : "Gemini-Naehrwerte konnten nicht uebernommen werden.",
       });
     } finally {
       setResearchBusy(false);
@@ -2483,35 +2406,27 @@ function AutomationScreen({
     <div className="screen stack">
       <section className="screen-title">
         <div>
-          <small>Automation</small>
-          <h1>Agent Console</h1>
+          <small>Gemini</small>
+          <h1>KI-Auswertung</h1>
         </div>
-        <Pill tone={usingCloud ? "good" : "warn"}>{usingCloud ? `Naechster Lauf ${formatTime(nextAgentRunAt)}` : "Login offen"}</Pill>
+        <Pill tone={usingCloud ? "good" : "warn"}>{usingCloud ? `naechster Lauf ${formatTime(nextGeminiRunAt)}` : "Login offen"}</Pill>
       </section>
 
       <section className="panel">
         <SectionHeader
-          title="Agent Mirror"
+          title="Gemini Snapshot"
           action={<Pill tone={nutritionResearchQueue.length ? "warn" : "good"}>{nutritionResearchQueue.length} Research offen</Pill>}
         />
-        <div className="token-box">
-          <KeyRound size={18} />
-          <input readOnly value={agentUrl} onFocus={(event) => event.currentTarget.select()} />
-        </div>
         <div className="button-row">
           <button className="primary-button" onClick={() => publishSnapshot()} disabled={publishing}>
             {publishing ? <Loader2 size={18} className="spin" /> : <UploadCloud size={18} />}
             Snapshot aktualisieren
           </button>
-          <button className="secondary-button" onClick={() => copyText(agentUrl)}>
-            <KeyRound size={18} />
-            Agent-URL kopieren
-          </button>
-          <button className="secondary-button" onClick={runAgentNow} disabled={manualRunBusy}>
+          <button className="secondary-button" onClick={runGeminiNow} disabled={manualRunBusy}>
             {manualRunBusy ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
             Jetzt ausfuehren
           </button>
-          <button className="secondary-button" onClick={applyAgentNutritionUpdates} disabled={researchBusy}>
+          <button className="secondary-button" onClick={applyGeminiNutritionUpdates} disabled={researchBusy}>
             {researchBusy ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
             Naehrwerte uebernehmen
           </button>
@@ -2520,19 +2435,19 @@ function AutomationScreen({
 
       <section className="panel integration-panel">
         <SectionHeader
-          title="Agent Wirkung"
+          title="Gemini Wirkung"
           action={<Pill tone={latestRun ? "good" : "warn"}>{latestRun ? `letzter Lauf ${formatTime(latestRun.createdAt)}` : "kein Lauf"}</Pill>}
         />
         <p className="panel-copy">
-          Der Agent schreibt keine Google Tasks. Er schreibt strukturierte taskActions, die hier als Einkaufsliste oder naechste Schritte sichtbar und uebernehmbar werden.
+          Gemini schreibt strukturierte Vorschlaege direkt in Firestore. Einkaufsideen und Naehrwert-Recherchen bleiben in der App, ohne externe Task-Liste.
         </p>
         {latestRun ? (
-          <div className="agent-run-card">
-            <strong>{latestRun.summary || "Agent-Lauf ohne Summary"}</strong>
+          <div className="gemini-run-card">
+            <strong>{latestRun.summary || "Gemini-Lauf ohne Summary"}</strong>
             <small>{latestRun.nextPriorities?.slice(0, 3).join(" - ") || "Keine naechsten Prioritaeten gespeichert."}</small>
           </div>
         ) : (
-          <EmptyLine text="Noch kein agentRun gespeichert." />
+          <EmptyLine text="Noch kein Gemini-Lauf gespeichert." />
         )}
         <div className="shopping-list-preview">
           {pendingShoppingActions.length === 0 && shoppingItems.slice(0, 8).map((item) => <span key={item}>{item}</span>)}
@@ -2541,9 +2456,9 @@ function AutomationScreen({
           ))}
         </div>
         <div className="button-row">
-          <button className="primary-button" onClick={applyAgentShoppingActions} disabled={taskBusy || pendingShoppingActions.length === 0}>
+          <button className="primary-button" onClick={applyGeminiShoppingActions} disabled={taskBusy || pendingShoppingActions.length === 0}>
             {taskBusy ? <Loader2 size={18} className="spin" /> : <ShoppingCart size={18} />}
-            Agent-Items uebernehmen
+            Gemini-Items uebernehmen
           </button>
         </div>
       </section>
@@ -2599,15 +2514,10 @@ function AutomationScreen({
             JSON-Beispiel kopieren
           </button>
           <button className="secondary-button" onClick={rotateShortcutToken}>
-            <RefreshCw size={18} />
-            Token rotieren
-          </button>
-        </div>
-      </section>
-
-      <section className="panel">
-        <SectionHeader title="Hourly Agent Prompt" />
-        <pre className="prompt-block">{dailyAgentPrompt(agentUrl)}</pre>
+          <RefreshCw size={18} />
+          Token rotieren
+        </button>
+      </div>
       </section>
     </div>
   );
@@ -2762,208 +2672,6 @@ function InsightsScreen({
   );
 }
 
-function AgentConsole({ token }: { token: string }) {
-  const [snapshot, setSnapshot] = useState<Record<string, unknown> | null>(null);
-  const [runs, setRuns] = useState<AgentRun[]>([]);
-  const [summary, setSummary] = useState("");
-  const [calendarActions, setCalendarActions] = useState("");
-  const [taskActions, setTaskActions] = useState("");
-  const [nutritionUpdatesJson, setNutritionUpdatesJson] = useState("");
-  const [insightUpdatesJson, setInsightUpdatesJson] = useState("");
-  const [hypothesisUpdatesJson, setHypothesisUpdatesJson] = useState("");
-  const [interventionActionsJson, setInterventionActionsJson] = useState("");
-  const [warnings, setWarnings] = useState("");
-  const [priorities, setPriorities] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!db) {
-      setError("Firebase ist noch nicht konfiguriert.");
-      return undefined;
-    }
-
-    const snapshotCleanup = onSnapshot(
-      doc(db, "agentAccess", token, "snapshots", "latest"),
-      (item) => {
-        setSnapshot(item.exists() ? normalizeFirestore<Record<string, unknown>>(item.data()) : null);
-      },
-      (nextError) => setError(nextError.message),
-    );
-
-    const runsCleanup = onSnapshot(
-      query(collection(db, "agentAccess", token, "agentRuns"), orderBy("createdAt", "desc")),
-      (items) => {
-        setRuns(items.docs.map((item) => normalizeFirestore<AgentRun>({ id: item.id, ...item.data() })));
-      },
-      () => undefined,
-    );
-
-    return () => {
-      snapshotCleanup();
-      runsCleanup();
-    };
-  }, [token]);
-
-  async function saveRun(event: FormEvent) {
-    event.preventDefault();
-    if (!db) return;
-    setSaving(true);
-    try {
-      const nutritionUpdates = parseNutritionUpdates(nutritionUpdatesJson);
-      const insightUpdates = parseJsonArray(insightUpdatesJson);
-      const hypothesisUpdates = parseJsonArray(hypothesisUpdatesJson);
-      const interventionActions = parseJsonArray(interventionActionsJson);
-      const parsedTaskActions = parseAgentTaskActionsText(taskActions);
-      await addDoc(collection(db, "agentAccess", token, "agentRuns"), {
-        createdAt: nowIso(),
-        summary,
-        calendarActions: calendarActions.split("\n").filter(Boolean),
-        taskActions: parsedTaskActions,
-        nutritionUpdates,
-        insightUpdates,
-        hypothesisUpdates,
-        interventionActions,
-        warnings: warnings.split("\n").filter(Boolean),
-        nextPriorities: priorities.split("\n").filter(Boolean),
-      });
-      setSummary("");
-      setCalendarActions("");
-      setTaskActions("");
-      setNutritionUpdatesJson("");
-      setInsightUpdatesJson("");
-      setHypothesisUpdatesJson("");
-      setInterventionActionsJson("");
-      setWarnings("");
-      setPriorities("");
-      setError("");
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Run konnte nicht gespeichert werden.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Shell>
-      <header className="app-header">
-        <div className="brand-button static">
-          <span className="brand-mark">
-            <FileJson size={18} />
-          </span>
-          <span>
-            <strong>Agent Console</strong>
-            <small>Raw mirror</small>
-          </span>
-        </div>
-      </header>
-
-      <div className="screen stack">
-        {error && <button className="notice notice-warn">{error}</button>}
-
-        <section className="panel">
-          <SectionHeader title="Hourly Instruction" />
-          <pre className="prompt-block">{dailyAgentPrompt(`${window.location.origin}${window.location.pathname}?agent=${token}`)}</pre>
-        </section>
-
-        <section className="panel">
-          <SectionHeader title="Firestore Mirror" />
-          {snapshot ? (
-            <pre className="json-block">{JSON.stringify(snapshot, null, 2)}</pre>
-          ) : (
-            <EmptyLine text="Kein Snapshot vorhanden." />
-          )}
-        </section>
-
-        <section className="panel">
-          <SectionHeader title="Run Log" />
-          <form className="form-grid" onSubmit={saveRun}>
-            <label className="field field-wide">
-              <span>Summary</span>
-              <textarea rows={3} value={summary} onChange={(event) => setSummary(event.target.value)} />
-            </label>
-            <label className="field field-wide">
-              <span>Calendar actions</span>
-              <textarea rows={3} value={calendarActions} onChange={(event) => setCalendarActions(event.target.value)} />
-            </label>
-            <label className="field field-wide">
-              <span>Task actions JSON</span>
-              <textarea
-                rows={5}
-                value={taskActions}
-                onChange={(event) => setTaskActions(event.target.value)}
-                placeholder="[]"
-              />
-            </label>
-            <label className="field field-wide">
-              <span>Nutrition updates JSON</span>
-              <textarea
-                rows={5}
-                value={nutritionUpdatesJson}
-                onChange={(event) => setNutritionUpdatesJson(event.target.value)}
-                placeholder="[]"
-              />
-            </label>
-            <label className="field field-wide">
-              <span>Insight updates JSON</span>
-              <textarea
-                rows={5}
-                value={insightUpdatesJson}
-                onChange={(event) => setInsightUpdatesJson(event.target.value)}
-                placeholder="[]"
-              />
-            </label>
-            <label className="field field-wide">
-              <span>Hypothesis updates JSON</span>
-              <textarea
-                rows={5}
-                value={hypothesisUpdatesJson}
-                onChange={(event) => setHypothesisUpdatesJson(event.target.value)}
-                placeholder="[]"
-              />
-            </label>
-            <label className="field field-wide">
-              <span>Intervention actions JSON</span>
-              <textarea
-                rows={5}
-                value={interventionActionsJson}
-                onChange={(event) => setInterventionActionsJson(event.target.value)}
-                placeholder="[]"
-              />
-            </label>
-            <label className="field field-wide">
-              <span>Warnings</span>
-              <textarea rows={3} value={warnings} onChange={(event) => setWarnings(event.target.value)} />
-            </label>
-            <label className="field field-wide">
-              <span>Next priorities</span>
-              <textarea rows={3} value={priorities} onChange={(event) => setPriorities(event.target.value)} />
-            </label>
-            <button className="primary-button field-wide" type="submit" disabled={saving}>
-              {saving ? <Loader2 size={18} className="spin" /> : <ShieldCheck size={18} />}
-              Run speichern
-            </button>
-          </form>
-        </section>
-
-        <section className="panel">
-          <SectionHeader title="Letzte Runs" />
-          <div className="list">
-            {runs.map((run) => (
-              <InfoRow
-                key={run.id}
-                icon={<Sparkles size={17} />}
-                title={run.summary || "Agent run"}
-                detail={`${run.calendarActions?.length ?? 0} Calendar - ${parseAgentTaskActions(run.taskActions).length} Tasks - ${run.nutritionUpdates?.length ?? 0} Naehrwerte - ${run.insightUpdates?.length ?? 0} Insights - ${run.hypothesisUpdates?.length ?? 0} Hypothesen - ${run.interventionActions?.length ?? 0} Interventionen - ${displayDate(run.createdAt.slice(0, 10))}`}
-              />
-            ))}
-          </div>
-        </section>
-      </div>
-    </Shell>
-  );
-}
-
 function SliderField({
   label,
   value,
@@ -3028,14 +2736,14 @@ function MealList({ meals, onRemove }: { meals: MealEntry[]; onRemove?: (id: str
     <div className="meal-list">
       {meals.map((meal) => {
         const nutrition = mealEntryNutrition(meal);
-        const isQueued = meal.confidence === "needs-agent";
+        const isQueued = meal.confidence === "needs-gemini";
         return (
           <article key={meal.id} className="meal-row">
             {meal.photo?.thumbnail && <img src={meal.photo.thumbnail} alt="" />}
             <div>
               <strong>{meal.description}</strong>
               <small>
-                {displayDate(meal.date)} - {mealLabels[meal.mealType]} - {isQueued ? "Agent recherchiert Naehrwerte" : nutrientLine(nutrition)}
+                {displayDate(meal.date)} - {mealLabels[meal.mealType]} - {isQueued ? "Gemini recherchiert Naehrwerte" : nutrientLine(nutrition)}
               </small>
             </div>
             {onRemove ? (
@@ -3058,7 +2766,7 @@ function MealList({ meals, onRemove }: { meals: MealEntry[]; onRemove?: (id: str
   );
 }
 
-function buildAgentSnapshot({
+function buildGeminiSnapshot({
   ownerUid,
   settings,
   data,
@@ -3085,21 +2793,19 @@ function buildAgentSnapshot({
     hypotheses: evidenceEngine.hypotheses,
     insightCards: evidenceEngine.insightCards,
     interventionCandidates: evidenceEngine.interventionCandidates,
-    automation: {
+    gemini: {
       cadence: "hourly_on_the_full_hour",
       nextExpectedRunAt: nextFullHour().toISOString(),
-      googleTasksListId: settings.googleTasksListId,
-      googleTasksListTitle: settings.googleTasksListTitle ?? SHOPPING_LIST_TITLE,
-      googleTasksSyncedAt: settings.googleTasksSyncedAt,
+      runTarget: "users/{uid}/geminiRuns",
+      snapshotTarget: "users/{uid}/geminiSnapshots/latest",
     },
     privacy: {
-      tokenScope: "Anyone with this URL can read this mirrored snapshot and create agent run logs.",
+      scope: "Private user Firestore document. No public token mirror.",
       drivePhotos: "Photos stay private unless a webViewLink is viewable in the owner's Drive settings.",
     },
-    instructions: dailyAgentPrompt(`${window.location.origin}${window.location.pathname}?agent=${settings.agentToken}`),
     guardrails: [
-      "Do not delete important calendar events.",
-      "You may move/add planning blocks and shopping items.",
+      "Use evidenceEngine as the primary source.",
+      "No diagnosis and no generic wellness filler.",
       "Do not invent nutrition values. Research unknown meals and write nutritionUpdates only with sources and confidence.",
       "Treat nutrition and micronutrients as estimates, not medical diagnosis.",
       "Prefer low-friction meals during exam/performance phases.",
@@ -3112,14 +2818,14 @@ function buildAgentSnapshot({
       latestDailyLog: latestByDate(data.dailyLogs),
       latestBodyStatus: latestByDate(data.bodyStatuses),
       todaysNutrition: nutritionForDate(data.mealEntries, todayKey()),
-      nextExpectedAgentRunAt: nextFullHour().toISOString(),
+      nextExpectedGeminiRunAt: nextFullHour().toISOString(),
     },
     shopping: {
       suggestedItems: shoppingItems,
       openItems: data.shoppingList.filter((item) => item.status === "open"),
       checkedRecent: data.shoppingList.filter((item) => item.status === "checked").slice().sort(sortByDateDesc).slice(0, 12),
-      targetService: "Healthtracker internal shopping list via agentRun.taskActions",
-      targetTaskListTitle: settings.googleTasksListTitle ?? SHOPPING_LIST_TITLE,
+      targetService: "Healthtracker internal shopping list via geminiRun.taskActions",
+      targetListTitle: SHOPPING_LIST_TITLE,
       taskActionContract: {
         action: "add | update | delete | check | note",
         target: SHOPPING_LIST_TITLE,
@@ -3153,77 +2859,4 @@ function buildAgentSnapshot({
       shoppingList: takeRecent(data.shoppingList, 80),
     },
   });
-}
-
-function dailyAgentPrompt(agentUrl: string) {
-  return [
-    "Open the Agent Console URL and read the Firestore mirror JSON:",
-    agentUrl,
-    "",
-    "## Evidence Protocol",
-    "",
-    "You are not a free-writing wellness coach.",
-    "Use the mirrored evidenceEngine fields as the primary source:",
-    "- dailyFacts",
-    "- hypotheses",
-    "- insightCards",
-    "- interventionCandidates",
-    "",
-    "Hard rules:",
-    "- Do not invent patterns.",
-    "- Do not claim a relationship unless it already exists in hypotheses.",
-    "- If you create a new hypothesis, create max 1 and set confidence='insufficient'.",
-    "- Every recommendation must be based on interventionCandidates.",
-    "- If interventionCandidates is empty, create a no-op agentRun.",
-    "- No generic wellness advice.",
-    "- No motivational filler.",
-    "- No diagnosis.",
-    "- No calendar changes without concrete evidence.",
-    "- No Google Tasks direct writes.",
-    "",
-    "Output exactly one agentRun object with these fields:",
-    JSON.stringify(
-      {
-        summary: "string",
-        insightUpdates: [],
-        hypothesisUpdates: [],
-        interventionActions: [],
-        calendarActions: [],
-        taskActions: [],
-        nutritionUpdates: [],
-        warnings: [],
-        nextPriorities: [],
-      },
-      null,
-      2,
-    ),
-    "",
-    "No-op agentRun when no action is justified:",
-    JSON.stringify(
-      {
-        summary: "Keine neue Aktion. Datenlage unverändert.",
-        insightUpdates: [],
-        hypothesisUpdates: [],
-        interventionActions: [],
-        calendarActions: [],
-        taskActions: [],
-        nutritionUpdates: [],
-        warnings: [],
-        nextPriorities: ["Heute Daten vollständig halten: Schlaf, Mahlzeiten, Fokus, Stress."],
-      },
-      null,
-      2,
-    ),
-    "",
-    "Limits:",
-    "- max 1 high-priority action per run",
-    "- max 2 low-friction suggestions per day",
-    "- max 1 new hypothesis per day",
-    "",
-    `Shopping changes must be written only as taskActions for target "${SHOPPING_LIST_TITLE}".`,
-    "",
-    "Nutrition rule:",
-    "Only write nutritionUpdates when you researched a queued meal with concrete sources. Do not invent nutrition values.",
-    "",
-  ].join("\n");
 }

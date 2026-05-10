@@ -22,22 +22,6 @@ service cloud.firestore {
       allow read, write: if ownsUserDoc(userId);
     }
 
-    match /agentAccess/{token}/snapshots/{snapshotId} {
-      allow read: if true;
-      allow write: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
-    }
-
-    match /agentAccess/{token}/meta/{docId} {
-      allow read: if true;
-      allow write: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
-    }
-
-    match /agentAccess/{token}/agentRuns/{runId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
-    }
-
     match /shortcutAccess/{token}/healthImports/{importId} {
       allow read, update, delete: if ownsShortcutToken(token);
       allow create: if request.resource.data.keys().hasOnly([

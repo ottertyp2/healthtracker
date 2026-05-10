@@ -904,7 +904,7 @@ button {
 }
 
 .shopping-hero div,
-.agent-run-card,
+.gemini-run-card,
 .shopping-item > div,
 .shopping-edit {
   display: grid;
@@ -925,7 +925,7 @@ button {
 }
 
 .shopping-hero span,
-.agent-run-card small {
+.gemini-run-card small {
   color: var(--muted);
   line-height: 1.45;
 }
@@ -993,7 +993,7 @@ button {
   gap: 6px;
 }
 
-.agent-run-card {
+.gemini-run-card {
   margin-bottom: 12px;
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--violet) 25%, var(--line));
@@ -1637,7 +1637,7 @@ textarea:focus-visible {
 .metric-card,
 .panel,
 .body-map-panel,
-.agent-run-card,
+.gemini-run-card,
 .shopping-item,
 .info-row,
 .meal-row,
@@ -1786,7 +1786,7 @@ textarea:focus-visible {
 .token-box,
 .chip-row span,
 .day-row,
-.agent-run-card,
+.gemini-run-card,
 .shopping-item,
 .progress-row span,
 .prompt-block,
@@ -1797,7 +1797,7 @@ textarea:focus-visible {
 .info-row,
 .meal-row,
 .shopping-item,
-.agent-run-card,
+.gemini-run-card,
 .day-row,
 .template-grid button {
   border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
@@ -1808,7 +1808,7 @@ textarea:focus-visible {
 .shopping-item:hover,
 .day-row:hover,
 .template-grid button:hover,
-.agent-run-card:hover {
+.gemini-run-card:hover {
   background: color-mix(in srgb, var(--surface-strong) 78%, transparent);
   border-color: color-mix(in srgb, var(--sky) 28%, var(--line));
   transform: translateY(-2px);
@@ -1992,7 +1992,7 @@ textarea:focus-visible {
   .shopping-item:hover,
   .day-row:hover,
   .template-grid button:hover,
-  .agent-run-card:hover,
+  .gemini-run-card:hover,
   .icon-button:hover,
   .secondary-button:hover,
   .icon-text-button:hover,
@@ -3368,7 +3368,7 @@ body::before {
 .meal-row,
 .token-box,
 .shopping-item,
-.agent-run-card {
+.gemini-run-card {
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: var(--radius-md);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(226, 236, 242, 0.74));
@@ -4634,12 +4634,9 @@ body {
   color: var(--text);
 }
 
-/* BioSoft Premium Fix: Hourly Agent Prompt Lesbarkeit */
+/* BioSoft Premium Fix: readonly prompt legibility */
 .panel pre,
 .panel code,
-.agent-prompt,
-.agent-prompt pre,
-.agent-prompt code,
 .automation-prompt,
 .automation-prompt pre,
 .automation-prompt code,
@@ -4651,7 +4648,6 @@ body {
 }
 
 .panel pre,
-.agent-prompt,
 .automation-prompt,
 .prompt-box {
   width: 100%;
@@ -4676,7 +4672,6 @@ body {
 }
 
 .panel pre *,
-.agent-prompt *,
 .automation-prompt *,
 .prompt-box * {
   color: inherit !important;

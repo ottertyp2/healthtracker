@@ -1,7 +1,7 @@
 {
   "name": "Healthtracker",
   "short_name": "Health",
-  "description": "Personal health, food, recovery and agent automation tracker.",
+  "description": "Personal health, food, recovery and Gemini insight tracker.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f1714",

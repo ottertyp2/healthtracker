@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .firebase/
+functions/lib/
 .env.local
 *.log
 healthtracker-*.png

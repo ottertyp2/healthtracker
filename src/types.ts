@@ -72,7 +72,7 @@ export type FoodReference = {
   id: string;
   name: string;
   aliases: string[];
-  category: "standard" | "generic" | "product" | "agent";
+  category: "standard" | "generic" | "product" | "gemini";
   nutrientsPer100g: Nutrients;
   source: string;
 };
@@ -84,7 +84,7 @@ export type MealItem = {
   foodRefId?: string;
   nutrients?: Nutrients;
   source?: string;
-  confidence?: "high" | "medium" | "needs-agent";
+  confidence?: "high" | "medium" | "needs-gemini";
 };
 
 export type MealPhoto = {
@@ -104,10 +104,10 @@ export type MealEntry = {
   items: MealItem[];
   total?: Nutrients;
   nutritionEstimate?: Nutrients;
-  confidence: "high" | "medium" | "needs-agent";
+  confidence: "high" | "medium" | "needs-gemini";
   photo?: MealPhoto;
   notes?: string;
-  agentResearch?: {
+  geminiResearch?: {
     status: "queued" | "applied" | "rejected";
     requestedAt?: string;
     updatedAt?: string;
@@ -204,17 +204,13 @@ export type BodyStatus = {
 
 export type AutomationSettings = {
   ownerUid?: string;
-  agentToken: string;
   shortcutToken: string;
   googleDriveFolderId?: string;
-  googleTasksListId?: string;
-  googleTasksListTitle?: string;
-  googleTasksSyncedAt?: string;
   createdAt: string;
   updatedAt: string;
 };
 
-export type AgentTaskAction = {
+export type GeminiTaskAction = {
   action: "add" | "update" | "delete" | "check" | "note";
   target: string;
   item: string;
@@ -230,8 +226,8 @@ export type ShoppingListItem = {
   reason?: string;
   priority: "low" | "medium" | "high";
   status: "open" | "checked";
-  source: "manual" | "agent" | "suggested";
-  agentRunId?: string;
+  source: "manual" | "gemini" | "suggested";
+  geminiRunId?: string;
   createdAt?: string;
   updatedAt?: string;
   checkedAt?: string;
@@ -373,7 +369,7 @@ export type InsightCard = {
   userRating?: "useful" | "not_useful";
 };
 
-export type AgentRun = {
+export type GeminiRun = {
   id: string;
   createdAt: string;
   summary: string;
@@ -383,7 +379,7 @@ export type AgentRun = {
   interventionActions?: Intervention[];
 
   calendarActions: string[];
-  taskActions: Array<string | AgentTaskAction>;
+  taskActions: Array<string | GeminiTaskAction>;
 
   nutritionUpdates?: Array<{
     mealId: string;

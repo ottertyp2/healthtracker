@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "firebase:deploy": "firebase deploy --only hosting,firestore:rules,firestore:indexes"
+    "firebase:deploy": "firebase deploy --only hosting,firestore:rules,firestore:indexes,functions"
   },
   "dependencies": {
     "firebase": "^12.6.0",

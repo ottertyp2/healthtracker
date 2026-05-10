@@ -255,8 +255,8 @@ export function buildMealFromItems(params: {
   photo?: MealEntry["photo"];
   notes?: string;
 }): MealEntry {
-  const confidence = params.items.some((item) => item.confidence === "needs-agent")
-    ? "needs-agent"
+  const confidence = params.items.some((item) => item.confidence === "needs-gemini")
+    ? "needs-gemini"
     : params.items.some((item) => item.confidence === "medium")
       ? "medium"
       : "high";
