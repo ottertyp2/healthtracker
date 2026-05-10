@@ -1,0 +1,19 @@
+{
+  "name": "healthtracker-functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "build": "tsc src/index.ts --outDir lib --module commonjs --target es2022 --moduleResolution node --esModuleInterop --skipLibCheck"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^6.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -11,6 +11,7 @@ import {
   setDoc,
   Timestamp,
 } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import {
   Activity,
   Apple,
@@ -47,7 +48,7 @@ import {
 } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, User } from "firebase/auth";
-import { auth, db, googleProvider, hasFirebaseConfig } from "./firebase";
+import { app, auth, db, googleProvider, hasFirebaseConfig } from "./firebase";
 import { bodyMuscleGroups, trainingPlans } from "./data/bodyModel";
 import {
   defaultFoods,
@@ -140,6 +141,8 @@ const supplementOptions = [
 const localDataKey = "healthtracker.local.data.v1";
 const localSettingsKey = "healthtracker.local.settings.v1";
 const SHOPPING_LIST_TITLE = "Healthtracker Einkaufsliste";
+const HEALTH_AGENT_TOKEN = "agent_d9346b520773dffccf60cc6d809ddd6e9b26";
+const HEALTH_AGENT_FUNCTIONS_REGION = "us-central1";
 
 function createEmptyData(): AppData {
   return {
@@ -2229,6 +2232,7 @@ function AutomationScreen({
   onNotice: (notice: Notice) => void;
 }) {
   const [publishing, setPublishing] = useState(false);
+  const [manualRunBusy, setManualRunBusy] = useState(false);
   const [researchBusy, setResearchBusy] = useState(false);
   const [taskBusy, setTaskBusy] = useState(false);
   const [recentRuns, setRecentRuns] = useState<AgentRun[]>([]);
@@ -2249,7 +2253,8 @@ function AutomationScreen({
   const latestRun = recentRuns[0];
   const nextAgentRunAt = nextFullHour();
   const appBaseUrl = `${window.location.origin}${window.location.pathname}`;
-  const agentUrl = `${appBaseUrl}?agent=${settings.agentToken}`;
+  const agentToken = HEALTH_AGENT_TOKEN;
+  const agentUrl = `${appBaseUrl}?agent=${agentToken}`;
   const lastPublishedSnapshotRef = useRef("");
   const shortcutBaseUrl = useMemo(() => buildHealthShortcutUrl(settings.shortcutToken), [settings.shortcutToken]);
   const shortcutJsonExampleUrl = useMemo(
@@ -2270,10 +2275,6 @@ function AutomationScreen({
     onNotice({ tone: "good", text: "In die Zwischenablage kopiert." });
   }
 
-  async function rotateAgentToken() {
-    await onSettings({ ...settings, agentToken: createToken("agent") });
-  }
-
   async function rotateShortcutToken() {
     await onSettings({ ...settings, shortcutToken: createToken("shortcut") });
   }
@@ -2290,13 +2291,13 @@ function AutomationScreen({
     try {
       const snapshot = buildAgentSnapshot({
         ownerUid: user.uid,
-        settings,
+        settings: { ...settings, agentToken },
         data,
         recovery,
         gymRecommendation,
       });
-      await setDoc(doc(db, "agentAccess", settings.agentToken, "snapshots", "latest"), snapshot);
-      await setDoc(doc(db, "agentAccess", settings.agentToken, "meta", "config"), {
+      await setDoc(doc(db, "agentAccess", agentToken, "snapshots", "latest"), snapshot);
+      await setDoc(doc(db, "agentAccess", agentToken, "meta", "config"), {
         ownerUid: user.uid,
         updatedAt: nowIso(),
       });
@@ -2309,11 +2310,11 @@ function AutomationScreen({
   }
 
   useEffect(() => {
-    if (!usingCloud || !db || !user || !settings.agentToken) return;
+    if (!usingCloud || !db || !user || !agentToken) return;
 
     const publishKey = JSON.stringify({
       ownerUid: user.uid,
-      agentToken: settings.agentToken,
+      agentToken,
       dailyLogs: data.dailyLogs.length,
       healthImports: data.healthImports.length,
       mealEntries: data.mealEntries.length,
@@ -2336,7 +2337,7 @@ function AutomationScreen({
   }, [
     usingCloud,
     user,
-    settings.agentToken,
+    agentToken,
     data,
     recovery.score,
     gymRecommendation.planName,
@@ -2349,13 +2350,56 @@ function AutomationScreen({
     }
 
     return onSnapshot(
-      query(collection(db, "agentAccess", settings.agentToken, "agentRuns"), orderBy("createdAt", "desc"), limit(8)),
+      query(collection(db, "agentAccess", agentToken, "agentRuns"), orderBy("createdAt", "desc"), limit(8)),
       (items) => {
         setRecentRuns(items.docs.map((item) => normalizeFirestore<AgentRun>({ id: item.id, ...item.data() })));
       },
       () => undefined,
     );
-  }, [usingCloud, settings.agentToken]);
+  }, [usingCloud, agentToken]);
+
+  async function runAgentNow() {
+    if (!usingCloud || !db || !user || !app) {
+      onNotice({ tone: "warn", text: "Manueller Agent-Lauf braucht Firebase Login." });
+      return;
+    }
+
+    setManualRunBusy(true);
+    try {
+      await publishSnapshot({ silent: true });
+      const functionsClient = getFunctions(app, HEALTH_AGENT_FUNCTIONS_REGION);
+      const trigger = httpsCallable(functionsClient, "runHealthAgentManual");
+      const result = await trigger();
+      const payload = result.data as { status?: string; mode?: string };
+
+      if (payload.status === "written") {
+        onNotice({
+          tone: "good",
+          text: payload.mode ? `Agent-Lauf manuell gestartet (${payload.mode}).` : "Agent-Lauf manuell gestartet.",
+        });
+        return;
+      }
+
+      if (payload.status === "deduped") {
+        onNotice({ tone: "info", text: "In dieser Stunde existiert bereits ein passender No-Op-Run." });
+        return;
+      }
+
+      if (payload.status === "no_snapshot") {
+        onNotice({ tone: "warn", text: "Kein Snapshot vorhanden. Bitte zuerst Snapshot aktualisieren." });
+        return;
+      }
+
+      onNotice({ tone: "warn", text: "Manueller Agent-Lauf lieferte kein verwertbares Ergebnis." });
+    } catch (error) {
+      onNotice({
+        tone: "warn",
+        text: error instanceof Error ? error.message : "Manueller Agent-Lauf ist fehlgeschlagen.",
+      });
+    } finally {
+      setManualRunBusy(false);
+    }
+  }
 
   async function applyAgentShoppingActions() {
     setTaskBusy(true);
@@ -2391,7 +2435,7 @@ function AutomationScreen({
     setResearchBusy(true);
     try {
       const runDocs = await getDocs(
-        query(collection(db, "agentAccess", settings.agentToken, "agentRuns"), orderBy("createdAt", "desc"), limit(20)),
+        query(collection(db, "agentAccess", agentToken, "agentRuns"), orderBy("createdAt", "desc"), limit(20)),
       );
       const updates = runDocs.docs.flatMap((item) =>
         extractNutritionUpdates(normalizeFirestore<AgentRun>({ id: item.id, ...item.data() })),
@@ -2459,9 +2503,13 @@ function AutomationScreen({
             {publishing ? <Loader2 size={18} className="spin" /> : <UploadCloud size={18} />}
             Snapshot aktualisieren
           </button>
-          <button className="secondary-button" onClick={rotateAgentToken}>
-            <RefreshCw size={18} />
-            Token rotieren
+          <button className="secondary-button" onClick={() => copyText(agentUrl)}>
+            <KeyRound size={18} />
+            Agent-URL kopieren
+          </button>
+          <button className="secondary-button" onClick={runAgentNow} disabled={manualRunBusy}>
+            {manualRunBusy ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
+            Jetzt ausfuehren
           </button>
           <button className="secondary-button" onClick={applyAgentNutritionUpdates} disabled={researchBusy}>
             {researchBusy ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
