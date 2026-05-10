@@ -4541,6 +4541,191 @@ body {
   }
 }
 
+/* BioSoft Premium Fix: Zuhause-Tage Layout */
+.panel:has(.day-list) {
+  overflow: hidden;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(232, 244, 239, 0.66)),
+    var(--surface);
+  box-shadow:
+    0 24px 70px rgba(42, 68, 58, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.day-list {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 26px;
+  background:
+    linear-gradient(145deg, rgba(213, 232, 225, 0.72), rgba(245, 250, 247, 0.5));
+}
+
+.day-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 24px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(229, 241, 236, 0.72));
+  box-shadow:
+    9px 12px 28px rgba(47, 75, 65, 0.11),
+    -8px -8px 22px rgba(255, 255, 255, 0.82),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.day-row:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--green) 30%, rgba(255, 255, 255, 0.72));
+  box-shadow:
+    12px 16px 34px rgba(47, 75, 65, 0.14),
+    -8px -8px 22px rgba(255, 255, 255, 0.84),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+}
+
+.day-row.active {
+  border-color: color-mix(in srgb, var(--green) 42%, rgba(255, 255, 255, 0.72));
+  background:
+    radial-gradient(circle at 18% 18%, rgba(64, 211, 158, 0.2), transparent 34%),
+    linear-gradient(145deg, rgba(238, 252, 246, 0.96), rgba(216, 241, 231, 0.82));
+}
+
+.day-row > button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  padding: 9px 14px;
+  border-radius: 18px;
+  color: var(--ink);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(225, 239, 234, 0.62));
+  box-shadow:
+    inset 4px 5px 12px rgba(76, 103, 93, 0.08),
+    inset -5px -5px 12px rgba(255, 255, 255, 0.75);
+  text-align: left;
+}
+
+.day-row > button strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.day-row > button small {
+  color: color-mix(in srgb, var(--muted) 86%, var(--ink));
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.meal-toggles {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.meal-toggles button {
+  min-height: 42px;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--ink) 72%, var(--muted));
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(229, 240, 235, 0.78));
+  box-shadow:
+    6px 8px 18px rgba(53, 79, 69, 0.1),
+    -5px -5px 14px rgba(255, 255, 255, 0.82),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.meal-toggles button:hover {
+  transform: translateY(-1px);
+  color: var(--green-strong);
+}
+
+.meal-toggles button.active {
+  color: var(--green-strong);
+  border-color: color-mix(in srgb, var(--green) 38%, rgba(255, 255, 255, 0.78));
+  background:
+    linear-gradient(145deg, rgba(228, 250, 241, 0.96), rgba(197, 236, 220, 0.86));
+  box-shadow:
+    inset 4px 5px 12px rgba(36, 122, 91, 0.13),
+    inset -4px -5px 12px rgba(255, 255, 255, 0.72);
+}
+
+@media (max-width: 720px) {
+  .panel:has(.day-list) {
+    border-radius: 26px;
+  }
+
+  .day-list {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .day-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    min-height: unset;
+    padding: 11px;
+    border-radius: 22px;
+  }
+
+  .day-row > button {
+    min-height: 58px;
+  }
+
+  .meal-toggles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .meal-toggles button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 420px) {
+  .day-row {
+    padding: 10px;
+  }
+
+  .day-row > button {
+    padding: 10px 12px;
+  }
+
+  .meal-toggles button {
+    padding: 0 10px;
+    font-size: 12px;
+  }
+}
+
 /* Desktop topbar polish fix
    Ziel: eine saubere schwebende Leiste statt überlappender Glas-Kacheln.
    Mobile bleibt unverändert.
