@@ -3989,3 +3989,152 @@ body {
     display: none;
   }
 }
+
+/* Desktop un-squash hotfix
+   Top-Tab-Navigation bleibt oben.
+   Mobile/iPhone bleibt unverändert.
+*/
+
+@media (min-width: 820px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-shell {
+    display: block;
+    width: min(1120px, calc(100vw - 48px)) !important;
+    max-width: 1120px !important;
+    min-width: 0 !important;
+    margin-inline: auto !important;
+    padding-inline: 24px !important;
+    padding-top: 128px !important;
+    padding-bottom: 42px !important;
+  }
+
+  .app-header {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 0 26px !important;
+  }
+
+  .app-shell > .screen,
+  .app-shell > .stack,
+  .screen,
+  .stack {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    justify-self: stretch !important;
+    align-self: stretch !important;
+  }
+
+  .screen,
+  .stack,
+  .screen.stack {
+    gap: 22px;
+  }
+
+  .today-hero {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 260px;
+    grid-template-columns: minmax(0, 1fr) 122px !important;
+    align-items: start;
+    padding: 34px 38px !important;
+    overflow: hidden;
+  }
+
+  .today-hero > div {
+    min-width: 0;
+    max-width: 760px;
+  }
+
+  .today-hero h1 {
+    max-width: 760px;
+    font-size: clamp(42px, 5vw, 72px) !important;
+    line-height: 0.92 !important;
+    letter-spacing: -0.065em !important;
+    overflow-wrap: normal;
+    word-break: normal;
+    text-wrap: balance;
+  }
+
+  .today-hero p {
+    max-width: 46rem;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  .score-ring {
+    width: 116px !important;
+    height: 116px !important;
+  }
+
+  .metric-grid {
+    width: 100% !important;
+    max-width: none !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 18px !important;
+  }
+
+  .metric-card {
+    min-height: 172px;
+    padding: 22px !important;
+  }
+
+  .metric-card strong {
+    font-size: clamp(25px, 2vw, 34px) !important;
+  }
+
+  .panel,
+  .body-map-panel {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(260px, 1fr)) !important;
+    gap: 18px !important;
+  }
+
+  .field-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 820px) and (max-width: 999px) {
+  .app-shell {
+    width: min(820px, calc(100vw - 32px)) !important;
+    padding-inline: 16px !important;
+  }
+
+  .today-hero {
+    grid-template-columns: minmax(0, 1fr) 104px !important;
+    padding: 28px !important;
+  }
+
+  .today-hero h1 {
+    font-size: clamp(36px, 7vw, 56px) !important;
+  }
+
+  .score-ring {
+    width: 104px !important;
+    height: 104px !important;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
