@@ -3842,3 +3842,150 @@ body {
     padding: 14px;
   }
 }
+
+/* BioSoft Premium desktop/tab + iPhone slider hotfix
+   - Mobile bleibt bottom nav.
+   - Desktop bekommt schwebende Tab-Kacheln oben.
+   - Range-Slider erben nicht mehr die Input-Bevel-Box.
+*/
+
+.field input[type="range"],
+.slider-field input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  outline: 0;
+  touch-action: pan-y;
+}
+
+.field input[type="range"]:focus,
+.slider-field input[type="range"]:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.field input[type="range"]::-webkit-slider-runnable-track,
+.slider-field input[type="range"]::-webkit-slider-runnable-track {
+  height: 14px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(45, 214, 166, 0.5), rgba(223, 232, 230, 0.88));
+  box-shadow:
+    inset 5px 6px 10px rgba(70, 98, 90, 0.1),
+    inset -5px -6px 10px rgba(255, 255, 255, 0.9);
+}
+
+.field input[type="range"]::-webkit-slider-thumb,
+.slider-field input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -7px;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #27d2a4, #0b9b72);
+  box-shadow:
+    0 10px 18px rgba(13, 122, 95, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.field input[type="range"]::-moz-range-track,
+.slider-field input[type="range"]::-moz-range-track {
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(45, 214, 166, 0.5), rgba(223, 232, 230, 0.88));
+  box-shadow:
+    inset 5px 6px 10px rgba(70, 98, 90, 0.1),
+    inset -5px -6px 10px rgba(255, 255, 255, 0.9);
+}
+
+.field input[type="range"]::-moz-range-thumb,
+.slider-field input[type="range"]::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #27d2a4, #0b9b72);
+  box-shadow:
+    0 10px 18px rgba(13, 122, 95, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.slider-field {
+  min-width: 0;
+}
+
+.slider-field span {
+  margin-bottom: 2px;
+}
+
+@media (min-width: 820px) {
+  .app-shell {
+    padding-top: 118px;
+    padding-bottom: 34px;
+  }
+
+  .app-header {
+    top: 98px;
+    z-index: 35;
+  }
+
+  .bottom-nav {
+    top: max(16px, env(safe-area-inset-top));
+    bottom: auto;
+    width: min(calc(100vw - 48px), 920px);
+    max-width: 920px;
+    grid-template-columns: repeat(9, minmax(72px, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border-radius: 32px;
+  }
+
+  .bottom-nav button {
+    display: grid;
+    gap: 6px;
+    min-height: 66px;
+    padding: 8px 6px;
+    border-radius: 22px;
+  }
+
+  .bottom-nav button span {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    color: inherit;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bottom-nav button svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .bottom-nav button.active {
+    transform: translateY(-1px);
+  }
+}
+
+@media (max-width: 819px) {
+  .bottom-nav button span {
+    display: none;
+  }
+}
