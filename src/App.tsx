@@ -59,6 +59,7 @@ import {
 } from "./data/defaultFoods";
 import { todayKey, addDays, displayDate, nowIso, sortByDateDesc } from "./lib/date";
 import { classNames, clamp, nutrientLine, round } from "./lib/format";
+import { buildEvidenceEngineSnapshot } from "./lib/evidence";
 import {
   averageBodyLoad,
   calculateRecoveryScore,
@@ -572,6 +573,18 @@ function parseNutritionUpdates(value: string): AgentRun["nutritionUpdates"] {
       };
     })
     .filter(Boolean) as AgentRun["nutritionUpdates"];
+}
+
+function parseJsonArray<T = unknown>(value: string): T[] {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  const parsed = JSON.parse(trimmed);
+  if (!Array.isArray(parsed)) {
+    throw new Error("JSON muss ein Array sein.");
+  }
+
+  return parsed as T[];
 }
 
 function mapLoadColor(load: number) {
@@ -2600,6 +2613,9 @@ function AgentConsole({ token }: { token: string }) {
   const [calendarActions, setCalendarActions] = useState("");
   const [taskActions, setTaskActions] = useState("");
   const [nutritionUpdatesJson, setNutritionUpdatesJson] = useState("");
+  const [insightUpdatesJson, setInsightUpdatesJson] = useState("");
+  const [hypothesisUpdatesJson, setHypothesisUpdatesJson] = useState("");
+  const [interventionActionsJson, setInterventionActionsJson] = useState("");
   const [warnings, setWarnings] = useState("");
   const [priorities, setPriorities] = useState("");
   const [saving, setSaving] = useState(false);
@@ -2639,6 +2655,9 @@ function AgentConsole({ token }: { token: string }) {
     setSaving(true);
     try {
       const nutritionUpdates = parseNutritionUpdates(nutritionUpdatesJson);
+      const insightUpdates = parseJsonArray(insightUpdatesJson);
+      const hypothesisUpdates = parseJsonArray(hypothesisUpdatesJson);
+      const interventionActions = parseJsonArray(interventionActionsJson);
       const parsedTaskActions = parseAgentTaskActionsText(taskActions);
       await addDoc(collection(db, "agentAccess", token, "agentRuns"), {
         createdAt: nowIso(),
@@ -2646,6 +2665,9 @@ function AgentConsole({ token }: { token: string }) {
         calendarActions: calendarActions.split("\n").filter(Boolean),
         taskActions: parsedTaskActions,
         nutritionUpdates,
+        insightUpdates,
+        hypothesisUpdates,
+        interventionActions,
         warnings: warnings.split("\n").filter(Boolean),
         nextPriorities: priorities.split("\n").filter(Boolean),
       });
@@ -2653,6 +2675,9 @@ function AgentConsole({ token }: { token: string }) {
       setCalendarActions("");
       setTaskActions("");
       setNutritionUpdatesJson("");
+      setInsightUpdatesJson("");
+      setHypothesisUpdatesJson("");
+      setInterventionActionsJson("");
       setWarnings("");
       setPriorities("");
       setError("");
@@ -2724,6 +2749,33 @@ function AgentConsole({ token }: { token: string }) {
               />
             </label>
             <label className="field field-wide">
+              <span>Insight updates JSON</span>
+              <textarea
+                rows={5}
+                value={insightUpdatesJson}
+                onChange={(event) => setInsightUpdatesJson(event.target.value)}
+                placeholder='[{"id":"insight-late-food","createdAt":"2026-05-10T12:00:00.000Z","title":"Spätes Essen könnte Schlaf drücken","claim":"An mehreren Tagen mit spätem Essen war Schlaf niedriger.","evidence":["2026-05-02: Dinner 22:10, sleep 6.2h"],"counterEvidence":[],"confidence":"weak","experiment":"3 Abende Dinner vor 20:30 testen."}]'
+              />
+            </label>
+            <label className="field field-wide">
+              <span>Hypothesis updates JSON</span>
+              <textarea
+                rows={5}
+                value={hypothesisUpdatesJson}
+                onChange={(event) => setHypothesisUpdatesJson(event.target.value)}
+                placeholder='[{"id":"late-caffeine-sleep","title":"Spätes Koffein verschiebt Schlaf","causeMetric":"caffeineAfter14Mg","outcomeMetric":"sleepHours","lagDays":0,"direction":"lower_is_better","minObservations":8,"observations":0,"confidence":"insufficient","evidenceSummary":"Noch keine Koffein-Zeitpunkte vorhanden.","status":"watching","updatedAt":"2026-05-10T12:00:00.000Z"}]'
+              />
+            </label>
+            <label className="field field-wide">
+              <span>Intervention actions JSON</span>
+              <textarea
+                rows={5}
+                value={interventionActionsJson}
+                onChange={(event) => setInterventionActionsJson(event.target.value)}
+                placeholder='[{"id":"intervention-sleep-1","createdAt":"2026-05-10T12:00:00.000Z","trigger":"low_sleep_high_stress","recommendation":"25 Min Spaziergang statt harter Gym-Block","expectedBenefit":"Schlafrisiko senken","friction":"low","confidence":"medium","result":"unknown"}]'
+              />
+            </label>
+            <label className="field field-wide">
               <span>Warnings</span>
               <textarea rows={3} value={warnings} onChange={(event) => setWarnings(event.target.value)} />
             </label>
@@ -2746,7 +2798,7 @@ function AgentConsole({ token }: { token: string }) {
                 key={run.id}
                 icon={<Sparkles size={17} />}
                 title={run.summary || "Agent run"}
-                detail={`${run.calendarActions?.length ?? 0} Calendar - ${parseAgentTaskActions(run.taskActions).length} Tasks - ${run.nutritionUpdates?.length ?? 0} Naehrwerte - ${displayDate(run.createdAt.slice(0, 10))}`}
+                detail={`${run.calendarActions?.length ?? 0} Calendar - ${parseAgentTaskActions(run.taskActions).length} Tasks - ${run.nutritionUpdates?.length ?? 0} Naehrwerte - ${run.insightUpdates?.length ?? 0} Insights - ${run.hypothesisUpdates?.length ?? 0} Hypothesen - ${run.interventionActions?.length ?? 0} Interventionen - ${displayDate(run.createdAt.slice(0, 10))}`}
               />
             ))}
           </div>
@@ -2867,10 +2919,16 @@ function buildAgentSnapshot({
     items.slice().sort(sortByDateDesc).slice(0, count);
   const shoppingItems = buildShoppingItems(data);
   const nutritionResearchQueue = buildNutritionResearchQueue(data);
+  const evidenceEngine = buildEvidenceEngineSnapshot(data, todayKey());
 
   return toFirestoreObject({
     ownerUid,
     generatedAt: nowIso(),
+    evidenceEngine,
+    dailyFacts: evidenceEngine.dailyFacts,
+    hypotheses: evidenceEngine.hypotheses,
+    insightCards: evidenceEngine.insightCards,
+    interventionCandidates: evidenceEngine.interventionCandidates,
     automation: {
       cadence: "hourly_on_the_full_hour",
       nextExpectedRunAt: nextFullHour().toISOString(),
@@ -2946,15 +3004,69 @@ function dailyAgentPrompt(agentUrl: string) {
     "Open the Agent Console URL and read the Firestore mirror JSON:",
     agentUrl,
     "",
-    "Hourly task, run every full hour:",
-    "1. Review sleep, body metrics, food, caffeine, stress, focus, gym load, soreness/pain, supplements and home days.",
-    "2. Research queued nutrition entries carefully. Do not invent generic values. Use reliable product/database/source estimates and write nutritionUpdates with mealId, nutrients, confidence, assumptions and sources.",
-    `3. Track detailed nutrients when sourceable: ${trackedNutrientKeys.join(", ")}.`,
-    "4. Check Google Calendar through the connected ChatGPT workflow.",
-    `5. Do not use Google Tasks directly. Write shopping/task changes as structured taskActions for target "${SHOPPING_LIST_TITLE}".`,
-    "6. Add or move deep-work, recovery, grocery and meal-prep blocks where useful.",
-    "7. Write an agentRun with summary, calendarActions, taskActions, nutritionUpdates, assumptions/warnings and next priorities.",
+    "## Intelligence Protocol",
     "",
-    "Guardrails: do not delete important calendar events unless explicitly instructed. Treat health guidance as optimization support, not diagnosis. Preserve raw detail because correlations matter.",
+    "You are not a free-writing wellness coach.",
+    "You are only allowed to use the mirrored evidenceEngine fields:",
+    "- dailyFacts",
+    "- hypotheses",
+    "- insightCards",
+    "- interventionCandidates",
+    "",
+    "Hard rules:",
+    "- Do not invent patterns.",
+    "- Do not claim a relationship unless it already exists in hypotheses.",
+    "- If you create a new hypothesis, create max 1 and set confidence='insufficient'.",
+    "- Every recommendation must be based on interventionCandidates.",
+    "- If interventionCandidates is empty, create a no-op agentRun.",
+    "- No generic wellness advice.",
+    "- No motivational filler.",
+    "- No diagnosis.",
+    "- No calendar changes without concrete evidence.",
+    "- No Google Tasks direct writes.",
+    "",
+    "Output must be one agentRun object with these fields:",
+    JSON.stringify(
+      {
+        summary: "string",
+        insightUpdates: [],
+        hypothesisUpdates: [],
+        interventionActions: [],
+        calendarActions: [],
+        taskActions: [],
+        nutritionUpdates: [],
+        warnings: [],
+        nextPriorities: [],
+      },
+      null,
+      2,
+    ),
+    "",
+    "No-op agentRun when there is no justified action:",
+    JSON.stringify(
+      {
+        summary: "Keine neue Aktion. Datenlage unverändert.",
+        insightUpdates: [],
+        hypothesisUpdates: [],
+        interventionActions: [],
+        calendarActions: [],
+        taskActions: [],
+        nutritionUpdates: [],
+        warnings: [],
+        nextPriorities: ["Heute Daten vollständig halten: Schlaf, Mahlzeiten, Fokus, Stress."],
+      },
+      null,
+      2,
+    ),
+    "",
+    "Action limits:",
+    "- max 1 high-priority action per run",
+    "- max 2 low-friction suggestions per day",
+    "- max 1 new hypothesis per day",
+    "",
+    `Shopping changes must be written only as taskActions for target "${SHOPPING_LIST_TITLE}".`,
+    "",
+    "Nutrition rule:",
+    "Only write nutritionUpdates when you researched a queued meal with concrete sources. Do not invent nutrition values.",
   ].join("\n");
 }
