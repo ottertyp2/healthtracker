@@ -3073,10 +3073,10 @@ function dailyAgentPrompt(agentUrl: string) {
     "Open the Agent Console URL and read the Firestore mirror JSON:",
     agentUrl,
     "",
-    "## Intelligence Protocol",
+    "## Evidence Protocol",
     "",
     "You are not a free-writing wellness coach.",
-    "You are only allowed to use the mirrored evidenceEngine fields:",
+    "Use the mirrored evidenceEngine fields as the primary source:",
     "- dailyFacts",
     "- hypotheses",
     "- insightCards",
@@ -3094,7 +3094,7 @@ function dailyAgentPrompt(agentUrl: string) {
     "- No calendar changes without concrete evidence.",
     "- No Google Tasks direct writes.",
     "",
-    "Output must be one agentRun object with these fields:",
+    "Output exactly one agentRun object with these fields:",
     JSON.stringify(
       {
         summary: "string",
@@ -3111,7 +3111,7 @@ function dailyAgentPrompt(agentUrl: string) {
       2,
     ),
     "",
-    "No-op agentRun when there is no justified action:",
+    "No-op agentRun when no action is justified:",
     JSON.stringify(
       {
         summary: "Keine neue Aktion. Datenlage unverändert.",
@@ -3128,7 +3128,7 @@ function dailyAgentPrompt(agentUrl: string) {
       2,
     ),
     "",
-    "Action limits:",
+    "Limits:",
     "- max 1 high-priority action per run",
     "- max 2 low-friction suggestions per day",
     "- max 1 new hypothesis per day",
