@@ -67,6 +67,7 @@ import {
 import { lookupBarcode } from "./lib/openFoodFacts";
 import { prepareMealPhoto } from "./lib/photos";
 import { createDrivePhotoClient, DrivePhotoUploadResult } from "./lib/drive";
+import { generateGeminiAutomationRun, hasGeminiConfig } from "./lib/gemini";
 import { googleOAuthClientId, hasGoogleOAuthClient } from "./lib/googleAuth";
 import {
   type GeminiTaskAction,
@@ -113,7 +114,7 @@ const defaultTabs: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
   { key: "training", label: "Gym", icon: <Dumbbell size={18} /> },
   { key: "supplements", label: "Supps", icon: <Activity size={18} /> },
   { key: "home", label: "Zuhause", icon: <Home size={18} /> },
-  { key: "automation", label: "KI", icon: <Sparkles size={18} /> },
+  { key: "automation", label: "Gemini", icon: <Sparkles size={18} /> },
   { key: "insights", label: "Analyse", icon: <BarChart3 size={18} /> },
 ];
 
@@ -1075,7 +1076,7 @@ function TodayScreen({
           tone={gymRecommendation.recoveryNeeded ? "warn" : "good"}
         />
         <MetricCard
-          label="KI"
+          label="Gemini"
           value={formatTime(nextFullHour())}
           detail="naechstes geplantes Update"
           icon={<Sparkles size={18} />}
@@ -2172,6 +2173,7 @@ function AutomationScreen({
   const [manualRunBusy, setManualRunBusy] = useState(false);
   const [researchBusy, setResearchBusy] = useState(false);
   const [taskBusy, setTaskBusy] = useState(false);
+  const [geminiBusy, setGeminiBusy] = useState(false);
   const [recentRuns, setRecentRuns] = useState<GeminiRun[]>([]);
   const shoppingItems = useMemo(() => buildShoppingItems(data), [data]);
   const nutritionResearchQueue = useMemo(() => buildNutritionResearchQueue(data), [data]);
@@ -2402,12 +2404,90 @@ function AutomationScreen({
     }
   }
 
+  async function runGeminiAutomation() {
+    if (!hasGeminiConfig()) {
+      onNotice({
+        tone: "warn",
+        text: "Gemini API Key fehlt: VITE_GEMINI_API_KEY in .env.local setzen.",
+      });
+      return;
+    }
+
+    setGeminiBusy(true);
+
+    try {
+      const runId = `gemini-${Date.now()}`;
+      const result = await generateGeminiAutomationRun({
+        today: todayKey(),
+        data,
+        recovery,
+        gymRecommendation,
+        nutritionResearchQueue,
+        shoppingItems,
+        trackedNutrientKeys,
+      });
+
+      let appliedMeals = 0;
+      let appliedShoppingItems = 0;
+      const mealsById = new Map(data.mealEntries.map((meal) => [meal.id, meal]));
+
+      for (const update of result.nutritionUpdates) {
+        const meal = mealsById.get(update.mealId);
+        if (!meal) continue;
+
+        const updatedMeal = {
+          ...meal,
+          confidence: update.confidence,
+          total: update.nutrients,
+          nutritionEstimate: update.nutrients,
+          nutritionSource: update.sources.join(", "),
+          nutritionAssumptions: update.assumptions,
+        };
+
+        await onSaveMeal(updatedMeal);
+        mealsById.set(update.mealId, updatedMeal);
+        appliedMeals += 1;
+      }
+
+      for (const action of parseGeminiTaskActions(result.taskActions)) {
+        if (!isShoppingAddAction(action)) continue;
+
+        const normalizedTitle = action.item.trim().toLowerCase();
+        if (openShoppingTitles.has(normalizedTitle)) continue;
+
+        await onSaveShoppingItem(
+          createShoppingListItem({
+            title: action.item,
+            reason: action.reason || "Von Gemini vorgeschlagen.",
+            priority: action.priority,
+            source: "gemini",
+            geminiRunId: runId,
+          }),
+        );
+
+        appliedShoppingItems += 1;
+      }
+
+      onNotice({
+        tone: "good",
+        text: `Gemini fertig: ${appliedMeals} Naehrwert-Updates, ${appliedShoppingItems} Einkaufs-Items.`,
+      });
+    } catch (error) {
+      onNotice({
+        tone: "warn",
+        text: error instanceof Error ? error.message : "Gemini konnte nicht ausgefuehrt werden.",
+      });
+    } finally {
+      setGeminiBusy(false);
+    }
+  }
+
   return (
     <div className="screen stack">
       <section className="screen-title">
         <div>
           <small>Gemini</small>
-          <h1>KI-Auswertung</h1>
+          <h1>Gemini-Auswertung</h1>
         </div>
         <Pill tone={usingCloud ? "good" : "warn"}>{usingCloud ? `naechster Lauf ${formatTime(nextGeminiRunAt)}` : "Login offen"}</Pill>
       </section>
@@ -2430,12 +2510,21 @@ function AutomationScreen({
             {researchBusy ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
             Naehrwerte uebernehmen
           </button>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={runGeminiAutomation}
+            disabled={geminiBusy || (!nutritionResearchQueue.length && !shoppingItems.length)}
+          >
+            {geminiBusy ? <Loader2 size={16} className="spin" /> : <Sparkles size={16} />}
+            Gemini ausfuehren
+          </button>
         </div>
       </section>
 
       <section className="panel integration-panel">
         <SectionHeader
-          title="Gemini Wirkung"
+          title="Gemini Ergebnis"
           action={<Pill tone={latestRun ? "good" : "warn"}>{latestRun ? `letzter Lauf ${formatTime(latestRun.createdAt)}` : "kein Lauf"}</Pill>}
         />
         <p className="panel-copy">

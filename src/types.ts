@@ -226,7 +226,7 @@ export type ShoppingListItem = {
   reason?: string;
   priority: "low" | "medium" | "high";
   status: "open" | "checked";
-  source: "manual" | "gemini" | "suggested";
+  source: "manual" | "agent" | "gemini" | "suggested";
   geminiRunId?: string;
   createdAt?: string;
   updatedAt?: string;

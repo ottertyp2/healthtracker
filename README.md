@@ -57,10 +57,17 @@ Supported URL parameters are `date`, `sleepHours`, `sleepStart`, `sleepEnd`, `st
 
 ## Gemini workflow
 
-The app writes a private snapshot to `users/{uid}/geminiSnapshots/latest`. The callable Function `runGeminiAnalysis` and the scheduled Function `runGeminiAnalysisScheduled` use the Gemini API with structured JSON output and write results to `users/{uid}/geminiRuns`.
+Die App nutzt Gemini fuer Automation im Healthtracker:
 
-Use "Naehrwerte uebernehmen" to apply researched nutrition values and "Gemini-Items uebernehmen" to move shopping suggestions into the app's built-in Einkaufsliste.
+1. `.env.local` mit `VITE_GEMINI_API_KEY` anlegen.
+2. Optional `VITE_GEMINI_MODEL=gemini-2.5-flash` setzen.
+3. App starten.
+4. Im Tab `Gemini` auf `Gemini ausfuehren` klicken.
+5. Gemini erhaelt den aktuellen App-Kontext als strukturiertes JSON.
+6. Gemini gibt strukturierte JSON-Ergebnisse zurueck:
+   - `nutritionUpdates` fuer geschaetzte Naehrwerte
+   - `taskActions` fuer Einkaufslisten-Vorschlaege
+   - `warnings`
+   - `nextPriorities`
 
-## Privacy note
-
-Gemini snapshots and runs live under the signed-in user's Firestore path. The old public mirror/token workflow has been removed.
+Hinweis: `VITE_GEMINI_API_KEY` ist im Browser sichtbar. Fuer produktive Nutzung sollte der Gemini-Aufruf ueber einen Backend-/Cloud-Function-Proxy laufen.
