@@ -2250,6 +2250,7 @@ function AutomationScreen({
   const nextAgentRunAt = nextFullHour();
   const appBaseUrl = `${window.location.origin}${window.location.pathname}`;
   const agentUrl = `${appBaseUrl}?agent=${settings.agentToken}`;
+  const lastPublishedSnapshotRef = useRef("");
   const shortcutBaseUrl = useMemo(() => buildHealthShortcutUrl(settings.shortcutToken), [settings.shortcutToken]);
   const shortcutJsonExampleUrl = useMemo(
     () =>
@@ -2277,9 +2278,11 @@ function AutomationScreen({
     await onSettings({ ...settings, shortcutToken: createToken("shortcut") });
   }
 
-  async function publishSnapshot() {
+  async function publishSnapshot({ silent = false }: { silent?: boolean } = {}) {
     if (!usingCloud || !db || !user) {
-      onNotice({ tone: "warn", text: "Agent Mirror braucht Firebase Login." });
+      if (!silent) {
+        onNotice({ tone: "warn", text: "Agent Mirror braucht Firebase Login." });
+      }
       return;
     }
 
@@ -2297,11 +2300,47 @@ function AutomationScreen({
         ownerUid: user.uid,
         updatedAt: nowIso(),
       });
-      onNotice({ tone: "good", text: "Agent Mirror wurde aktualisiert." });
+      if (!silent) {
+        onNotice({ tone: "good", text: "Snapshot aktualisiert." });
+      }
     } finally {
       setPublishing(false);
     }
   }
+
+  useEffect(() => {
+    if (!usingCloud || !db || !user || !settings.agentToken) return;
+
+    const publishKey = JSON.stringify({
+      ownerUid: user.uid,
+      agentToken: settings.agentToken,
+      dailyLogs: data.dailyLogs.length,
+      healthImports: data.healthImports.length,
+      mealEntries: data.mealEntries.length,
+      supplements: data.supplements.length,
+      trainingSessions: data.trainingSessions.length,
+      homeDays: data.homeDays.length,
+      bodyStatuses: data.bodyStatuses.length,
+      shoppingList: data.shoppingList.length,
+      recoveryScore: recovery.score,
+      gymPlan: gymRecommendation.planName,
+      updatedAt: nowIso().slice(0, 13),
+    });
+
+    if (lastPublishedSnapshotRef.current === publishKey) return;
+    lastPublishedSnapshotRef.current = publishKey;
+
+    publishSnapshot({ silent: true }).catch(() => {
+      lastPublishedSnapshotRef.current = "";
+    });
+  }, [
+    usingCloud,
+    user,
+    settings.agentToken,
+    data,
+    recovery.score,
+    gymRecommendation.planName,
+  ]);
 
   useEffect(() => {
     if (!usingCloud || !db) {
@@ -2416,9 +2455,9 @@ function AutomationScreen({
           <input readOnly value={agentUrl} onFocus={(event) => event.currentTarget.select()} />
         </div>
         <div className="button-row">
-          <button className="primary-button" onClick={publishSnapshot} disabled={publishing}>
+          <button className="primary-button" onClick={() => publishSnapshot()} disabled={publishing}>
             {publishing ? <Loader2 size={18} className="spin" /> : <UploadCloud size={18} />}
-            Mirror aktualisieren
+            Snapshot aktualisieren
           </button>
           <button className="secondary-button" onClick={rotateAgentToken}>
             <RefreshCw size={18} />
