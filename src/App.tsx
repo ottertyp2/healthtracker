@@ -2728,6 +2728,8 @@ function AgentConsole({ token }: { token: string }) {
   const [priorities, setPriorities] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const agentWriteEndpoint = buildAgentRunEndpoint(token);
+  const agentWriteCurlExample = buildAgentRunCurlExample(token);
 
   useEffect(() => {
     if (!db) {
@@ -2815,7 +2817,23 @@ function AgentConsole({ token }: { token: string }) {
 
         <section className="panel">
           <SectionHeader title="Hourly Instruction" />
-          <pre className="prompt-block">{dailyAgentPrompt(window.location.href)}</pre>
+          <pre className="prompt-block">{dailyAgentPrompt(`${window.location.origin}${window.location.pathname}?agent=${token}`)}</pre>
+        </section>
+
+        <section className="panel">
+          <SectionHeader title="Agent Write API" />
+          <div className="stack">
+            <div className="field field-wide">
+              <span>Firestore REST Endpoint</span>
+              <code>{agentWriteEndpoint}</code>
+            </div>
+            <p className="empty-line">Der Agent soll nach jedem Lauf den agentRun per HTTP POST an diesen Endpoint senden.</p>
+            <p className="empty-line">Der Body muss Firestore REST Format haben, nicht normales JSON.</p>
+            <label className="field field-wide">
+              <span>Beispiel</span>
+              <textarea readOnly rows={20} value={agentWriteCurlExample} />
+            </label>
+          </div>
         </section>
 
         <section className="panel">
@@ -3107,7 +3125,42 @@ function buildAgentSnapshot({
   });
 }
 
+function buildAgentRunEndpoint(agentToken: string) {
+  return `https://firestore.googleapis.com/v1/projects/healthtracker-5f7a4/databases/(default)/documents/agentAccess/${agentToken}/agentRuns`;
+}
+
+function buildAgentRunCurlExample(agentToken: string) {
+  const endpoint = buildAgentRunEndpoint(agentToken);
+  return [
+    "curl -X POST \\",
+    `  "${endpoint}" \\`,
+    '  -H "Content-Type: application/json" \\',
+    "  -d '{",
+    '    "fields": {',
+    '      "createdAt": { "stringValue": "ISO_DATE" },',
+    '      "summary": { "stringValue": "Keine neue Aktion. Datenlage unveraendert." },',
+    '      "calendarActions": { "arrayValue": { "values": [] } },',
+    '      "taskActions": { "arrayValue": { "values": [] } },',
+    '      "nutritionUpdates": { "arrayValue": { "values": [] } },',
+    '      "insightUpdates": { "arrayValue": { "values": [] } },',
+    '      "hypothesisUpdates": { "arrayValue": { "values": [] } },',
+    '      "interventionActions": { "arrayValue": { "values": [] } },',
+    '      "warnings": { "arrayValue": { "values": [] } },',
+    '      "nextPriorities": {',
+    '        "arrayValue": {',
+    '          "values": [',
+    '            { "stringValue": "Heute Daten vollstaendig halten: Schlaf, Mahlzeiten, Fokus, Stress." }',
+    '          ]',
+    '        }',
+    '      }',
+    '    }',
+    "  }'",
+  ].join("\n");
+}
+
 function dailyAgentPrompt(agentUrl: string) {
+  const agentToken = new URL(agentUrl).searchParams.get("agent") ?? "AGENT_TOKEN";
+  const agentRunEndpoint = buildAgentRunEndpoint(agentToken);
   return [
     "Open the Agent Console URL and read the Firestore mirror JSON:",
     agentUrl,
@@ -3176,5 +3229,19 @@ function dailyAgentPrompt(agentUrl: string) {
     "",
     "Nutrition rule:",
     "Only write nutritionUpdates when you researched a queued meal with concrete sources. Do not invent nutrition values.",
+    "",
+    "## Save Requirement",
+    "",
+    "You must not only answer in chat.",
+    "",
+    "After creating the agentRun JSON, save it to Firestore by sending an HTTP POST request to:",
+    agentRunEndpoint,
+    "",
+    "Use Firestore REST field format.",
+    "",
+    'If you cannot make HTTP requests, say exactly:',
+    '"I cannot save the run myself. Please paste the JSON manually into the Agent Console."',
+    "",
+    'Never claim that the run was saved unless the HTTP request succeeded or the new run is visible under "Letzte Runs".',
   ].join("\n");
 }
