@@ -4541,6 +4541,69 @@ body {
   }
 }
 
+/* BioSoft Premium Fix: Hourly Agent Prompt Lesbarkeit */
+.panel pre,
+.panel code,
+.agent-prompt,
+.agent-prompt pre,
+.agent-prompt code,
+.automation-prompt,
+.automation-prompt pre,
+.automation-prompt code,
+.prompt-box,
+.prompt-box pre,
+.prompt-box code {
+  color: var(--ink) !important;
+  text-shadow: none !important;
+}
+
+.panel pre,
+.agent-prompt,
+.automation-prompt,
+.prompt-box {
+  width: 100%;
+  max-width: 100%;
+  margin: 10px 0 0;
+  padding: 18px 20px;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(226, 241, 235, 0.78)) !important;
+  box-shadow:
+    inset 5px 6px 16px rgba(69, 96, 86, 0.1),
+    inset -6px -6px 18px rgba(255, 255, 255, 0.78),
+    0 14px 34px rgba(45, 74, 63, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.panel pre *,
+.agent-prompt *,
+.automation-prompt *,
+.prompt-box * {
+  color: inherit !important;
+}
+
+.panel:has(pre) h2,
+.panel:has(pre) h3 {
+  color: var(--ink);
+}
+
+/* BioSoft Premium Fix: readonly Prompt-Textarea */
+.panel textarea[readonly],
+.panel textarea:disabled {
+  color: var(--ink) !important;
+  -webkit-text-fill-color: var(--ink) !important;
+  opacity: 1 !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(226, 241, 235, 0.8)) !important;
+}
+
 /* BioSoft Premium Fix: Zuhause-Tage Layout */
 .panel:has(.day-list) {
   overflow: hidden;
